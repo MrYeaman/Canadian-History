@@ -159,6 +159,13 @@
         const confirmSubmitBtn = document.getElementById('confirm-submit-btn');
         const submitAssessmentBtn = document.getElementById('submit-assessment-btn');
 
+        // Anti-Cheat: Prevent copy, paste, cut, drop, and right-click in the writing area
+        ['cut', 'copy', 'paste', 'drop', 'contextmenu'].forEach(evt => {
+            writingArea.addEventListener(evt, (e) => {
+                e.preventDefault();
+            });
+        });
+
         const enterFullscreen = async () => {
             try {
                 const docElm = document.documentElement;
