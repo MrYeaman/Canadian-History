@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grade 10 History: Writing Portal</title>
+    <title>History Class: Writing Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap');
@@ -20,6 +20,10 @@
         }
         .paper-texture:focus { outline: none; border-color: #94a3b8; }
         .hidden { display: none !important; }
+        
+        /* Fullscreen specific styling */
+        :fullscreen body { background-color: white; }
+        :-webkit-full-screen body { background-color: white; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -30,25 +34,43 @@
             <div class="text-center mb-8">
                 <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-800">Student Portal</h2>
-                <p class="text-gray-500 text-sm">Select your assignment and enter your name</p>
+                <h2 class="text-2xl font-bold text-gray-800">Secure Writing Portal</h2>
+                <p class="text-gray-500 text-sm">Entering will activate Fullscreen Focus Mode.</p>
             </div>
             <form id="auth-form" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assignment</label>
-                    <select id="assignment-select" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base bg-gray-50">
-                        <option value="Home Front Letter">Letter from the Home Front</option>
-                    </select>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assignment Title</label>
+                    <input type="text" id="assignment-input" placeholder="e.g. Confederation Analysis" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Your Name</label>
-                    <input type="text" id="first-name" placeholder="e.g. Alex" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
+                    <input type="text" id="first-name" placeholder="Full Name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors pt-4">Enter Writing Space</button>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">Start Assessment</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Exit Warning Modal -->
+    <div id="warning-modal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl max-w-sm w-full p-6 text-center">
+            <h3 class="text-xl font-bold text-red-600 mb-2">Warning!</h3>
+            <p class="text-gray-600 mb-6">Exiting fullscreen will automatically submit your assignment. Please return to fullscreen immediately.</p>
+            <button id="resume-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Return to Fullscreen</button>
+        </div>
+    </div>
+
+    <!-- Final Submission Blocked Overlay -->
+    <div id="lock-overlay" class="fixed inset-0 bg-white z-[70] flex items-center justify-center p-4 hidden">
+        <div class="text-center">
+            <div class="text-green-500 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-800">Assignment Submitted</h2>
+            <p class="text-gray-500 mt-2">Fullscreen was exited. Your work has been finalized and sent to the teacher.</p>
         </div>
     </div>
 
@@ -64,17 +86,17 @@
         </div>
         <div class="flex items-center gap-6">
             <div id="word-count" class="text-sm font-bold text-gray-700 hidden sm:block">0 words</div>
-            <div id="connection-status" class="w-3 h-3 rounded-full bg-gray-300"></div>
+            <div id="connection-status" class="w-3 h-3 rounded-full bg-gray-300" title="Connection Status"></div>
         </div>
     </header>
 
     <main class="flex-1 max-w-4xl w-full mx-auto p-6 md:p-10">
         <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg shadow-sm">
-            <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 italic text-lg">---</h2>
-            <p id="prompt-desc" class="text-blue-800 text-sm italic">Please follow the instructions provided in class. Ensure you mention rationing, the war effort, and the local atmosphere.</p>
+            <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 text-lg">Assignment Instructions</h2>
+            <p id="prompt-desc" class="text-blue-800 text-sm italic">Focus Mode Active. Exiting fullscreen or navigating away will automatically submit your work.</p>
         </div>
         <div class="relative">
-            <textarea id="writing-area" class="paper-texture w-full min-h-[650px] p-10 rounded-lg resize-none overflow-y-auto" placeholder="Dearest..." disabled></textarea>
+            <textarea id="writing-area" class="paper-texture w-full min-h-[650px] p-10 rounded-lg resize-none overflow-y-auto" placeholder="Start writing here..." disabled></textarea>
             <div id="save-status" class="absolute bottom-4 right-6 text-xs text-gray-400 italic">Connecting...</div>
         </div>
     </main>
@@ -85,7 +107,6 @@
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- FIREBASE CONFIGURATION ---
-        // Your project config
         const manualConfig = {
             apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
             authDomain: "canadian-history-portal.firebaseapp.com",
@@ -95,7 +116,6 @@
             appId: "1:21075780226:web:7b6d9b938e7bedb9e80a9b"
         };
 
-        // Select the active config
         const activeConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : manualConfig;
@@ -107,22 +127,64 @@
 
         let firstName = localStorage.getItem('hp_name');
         let selectedAssignment = localStorage.getItem('hp_assignment');
+        let hasWarned = false;
+        let isSubmitted = false;
 
         const authOverlay = document.getElementById('auth-overlay');
         const writingArea = document.getElementById('writing-area');
         const saveStatus = document.getElementById('save-status');
         const statusIndicator = document.getElementById('connection-status');
+        const warningModal = document.getElementById('warning-modal');
+        const lockOverlay = document.getElementById('lock-overlay');
+        const resumeBtn = document.getElementById('resume-btn');
+
+        // Fullscreen Logic
+        const enterFullscreen = () => {
+            const docElm = document.documentElement;
+            if (docElm.requestFullscreen) docElm.requestFullscreen();
+            else if (docElm.mozRequestFullScreen) docElm.mozRequestFullScreen();
+            else if (docElm.webkitRequestFullScreen) docElm.webkitRequestFullScreen();
+            else if (docElm.msRequestFullscreen) docElm.msRequestFullscreen();
+        };
 
         document.getElementById('auth-form').addEventListener('submit', (e) => {
             e.preventDefault();
             firstName = document.getElementById('first-name').value.trim();
-            selectedAssignment = document.getElementById('assignment-select').value;
+            selectedAssignment = document.getElementById('assignment-input').value.trim();
             
             localStorage.setItem('hp_name', firstName);
             localStorage.setItem('hp_assignment', selectedAssignment);
             
+            enterFullscreen();
             initAuth();
         });
+
+        resumeBtn.addEventListener('click', enterFullscreen);
+
+        document.addEventListener('fullscreenchange', handleFullscreenExit);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenExit);
+        document.addEventListener('mozfullscreenchange', handleFullscreenExit);
+        document.addEventListener('MSFullscreenChange', handleFullscreenExit);
+
+        async function handleFullscreenExit() {
+            if (!document.fullscreenElement && !document.webkitIsFullScreen && !document.mozFullScreen && !document.msFullscreenElement) {
+                if (isSubmitted) return;
+
+                if (!hasWarned) {
+                    warningModal.classList.remove('hidden');
+                    hasWarned = true;
+                } else {
+                    // Second exit - Auto Submit and Lock
+                    isSubmitted = true;
+                    writingArea.disabled = true;
+                    warningModal.classList.add('hidden');
+                    lockOverlay.classList.remove('hidden');
+                    await saveData(true); // Final save
+                }
+            } else {
+                warningModal.classList.add('hidden');
+            }
+        }
 
         const initAuth = async () => {
             try {
@@ -142,7 +204,6 @@
                 authOverlay.classList.add('hidden');
                 document.getElementById('user-display').textContent = firstName;
                 document.getElementById('header-assignment').textContent = selectedAssignment;
-                document.getElementById('prompt-title').textContent = selectedAssignment;
                 
                 statusIndicator.classList.remove('bg-gray-300');
                 statusIndicator.classList.add('bg-green-500');
@@ -163,7 +224,16 @@
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', docId);
             try {
                 const snap = await getDoc(docRef);
-                if (snap.exists()) writingArea.value = snap.data().content || "";
+                if (snap.exists()) {
+                    if (snap.data().submitted) {
+                        isSubmitted = true;
+                        writingArea.value = snap.data().content || "";
+                        writingArea.disabled = true;
+                        lockOverlay.classList.remove('hidden');
+                    } else {
+                        writingArea.value = snap.data().content || "";
+                    }
+                }
                 saveStatus.textContent = "Last sync: Just now";
                 updateWordCount();
             } catch (e) {
@@ -174,6 +244,7 @@
 
         let timer;
         writingArea.addEventListener('input', () => {
+            if (isSubmitted) return;
             saveStatus.textContent = "Typing...";
             clearTimeout(timer);
             timer = setTimeout(saveData, 1000);
@@ -185,8 +256,8 @@
             document.getElementById('word-count').textContent = `${words} words`;
         }
 
-        async function saveData() {
-            if (!auth.currentUser || !firstName) return;
+        async function saveData(final = false) {
+            if (!auth.currentUser || !firstName || (isSubmitted && !final)) return;
             const docId = getStorageId();
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', docId);
             
@@ -196,16 +267,16 @@
                     assignment: selectedAssignment,
                     content: writingArea.value,
                     lastUpdated: new Date().toISOString(),
-                    wordCount: writingArea.value.trim().split(/\s+/).length
+                    wordCount: writingArea.value.trim().split(/\s+/).length,
+                    submitted: final || isSubmitted
                 }, { merge: true });
-                saveStatus.textContent = "Cloud saved: " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                saveStatus.textContent = final ? "FINAL SUBMISSION SAVED" : "Cloud saved: " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
             } catch (e) {
                 console.error("Save error:", e);
                 saveStatus.textContent = "Offline / Save Error";
             }
         }
 
-        // Initialize if already logged in
         if (firstName && selectedAssignment) {
             initAuth();
         }
