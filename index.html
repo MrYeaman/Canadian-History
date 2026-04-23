@@ -3,11 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grade 10 History Portal</title>
+    <title>Grade 10 History - Teacher Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        
+        body { background-color: #020617; font-family: 'Inter', sans-serif; }
+        .status-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+        
+        #modal-content::-webkit-scrollbar { width: 8px; }
+        #modal-content::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        
         .paper-texture {
             background-color: #fffdfa;
             background-image: linear-gradient(#e5e5e5 1px, transparent 1px);
@@ -15,118 +22,77 @@
             line-height: 2.5rem;
             font-family: 'Crimson Pro', serif;
             font-size: 1.25rem;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        .paper-texture:focus { outline: none; border-color: #94a3b8; }
-        .hidden { display: none !important; }
-        
-        :fullscreen body { background-color: white; }
-        :-webkit-full-screen body { background-color: white; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="text-slate-100 min-h-screen p-4 md:p-8">
 
-    <!-- Login Overlay -->
-    <div id="auth-overlay" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-            <div class="text-center mb-8">
-                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800">Grade 10 History Portal</h2>
-                <p class="text-gray-500 text-sm">Enter details to begin your assessment.</p>
-            </div>
-            
-            <form id="auth-form" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assignment Title</label>
-                    <input type="text" id="assignment-input" placeholder="e.g. World War II Analysis" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Full Name</label>
-                    <input type="text" id="first-name" placeholder="First & Last Name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
-                </div>
-                <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">Start Assessment</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Exit Warning Modal -->
-    <div id="warning-modal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-xl max-w-sm w-full p-6 text-center">
-            <h3 class="text-xl font-bold text-red-600 mb-2">Security Warning</h3>
-            <p class="text-gray-600 mb-6 text-sm">Attempting to leave the portal is prohibited. Your next violation will result in an automatic submission of your work.</p>
-            <button id="resume-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Return to Assessment</button>
-        </div>
-    </div>
-
-    <!-- Submit Confirmation Modal -->
-    <div id="submit-modal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-xl max-w-sm w-full p-6 text-center border-t-8 border-green-500 shadow-2xl">
-            <h3 class="text-2xl font-bold text-gray-800 mb-2">Final Submission?</h3>
-            <p class="text-gray-600 mb-6 font-medium text-sm">You cannot edit your answers after confirming. Are you sure you are ready to submit your assessment?</p>
-            <div class="flex gap-4">
-                <button id="cancel-submit-btn" class="flex-1 bg-gray-200 text-gray-600 py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-gray-300">Keep Writing</button>
-                <button id="confirm-submit-btn" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-green-700">Submit Exam</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Final Submission Blocked Overlay -->
-    <div id="lock-overlay" class="fixed inset-0 bg-white z-[70] flex items-center justify-center p-4 hidden text-center">
+    <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
         <div>
-            <div class="text-green-500 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <h2 class="text-3xl font-bold text-gray-800">Assignment Submitted</h2>
-            <p class="text-gray-500 mt-2">Your work has been locked and sent to your teacher.</p>
-            <button id="return-login-btn" class="mt-8 text-blue-600 underline font-semibold">Start New Assessment</button>
+            <h1 class="text-3xl font-bold text-white tracking-tight">Exam Control Tower</h1>
+            <p class="text-slate-500 font-medium tracking-wide mt-1">Grade 10 History Portal: Live Monitoring</p>
         </div>
-    </div>
-
-    <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-        <div class="flex items-center gap-4">
-            <div class="bg-blue-100 p-2 rounded-lg text-blue-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+        
+        <div class="flex flex-wrap items-end gap-4 w-full md:w-auto">
+            <div class="flex-1 min-w-[200px]">
+                <input type="text" id="search-input" placeholder="Search by name or assignment..." class="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm">
             </div>
-            <div>
-                <h1 id="header-assignment" class="font-bold text-gray-800 leading-tight text-sm sm:text-base">Loading...</h1>
-                <p id="user-display" class="text-xs text-blue-600 font-semibold italic">Not signed in</p>
+            <button id="export-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-bold transition flex items-center gap-2 shadow-lg text-sm h-[38px]">
+                Export CSV
+            </button>
+            <div class="bg-slate-900 px-6 py-1.5 rounded-lg border border-slate-800 text-center h-[38px] flex flex-col justify-center">
+                <span class="text-[9px] text-slate-500 block uppercase font-black tracking-widest leading-none mb-0.5">Active Writers</span>
+                <span id="active-count" class="text-xl font-mono font-bold text-emerald-400 leading-none">0</span>
             </div>
-        </div>
-        <div class="flex items-center gap-4 sm:gap-6">
-            <div id="word-count" class="text-sm font-bold text-gray-700 hidden sm:block">0 words</div>
-            <div id="connection-status" class="w-3 h-3 rounded-full bg-gray-300" title="Connection Status"></div>
-            <button id="logout-btn" class="text-xs text-gray-400 hover:text-gray-600 underline">Submit & Exit</button>
         </div>
     </header>
 
-    <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-10 flex flex-col">
-        <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg shadow-sm">
-            <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 text-lg">Secure Writing Mode</h2>
-            <p id="prompt-desc" class="text-blue-800 text-sm italic">Assessment is active. Do not switch tabs or exit fullscreen until finished.</p>
+    <main class="max-w-7xl mx-auto pb-12">
+        <!-- Connecting indicator -->
+        <div id="loading-indicator" class="text-center py-12 text-slate-500">
+            <svg class="animate-spin h-8 w-8 mx-auto mb-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            Connecting to secure server...
         </div>
-        <div class="relative flex-1">
-            <textarea id="writing-area" class="paper-texture w-full min-h-[60vh] p-6 md:p-10 rounded-lg resize-none overflow-y-auto" placeholder="Start typing your response here..." disabled></textarea>
-            <div id="save-status" class="absolute bottom-4 right-6 text-xs text-gray-400 italic font-semibold">Connecting...</div>
+
+        <div id="student-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden">
+            <!-- Student cards will be injected here by JS -->
         </div>
         
-        <div id="submission-controls" class="mt-8 flex flex-col sm:flex-row justify-between items-center border-t border-gray-200 pt-6 hidden">
-            <div class="text-gray-500 text-sm italic mb-4 sm:mb-0">Your work is continuously auto-saved.</div>
-            <button id="submit-assessment-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-lg font-bold shadow-lg uppercase tracking-widest text-sm transition transform hover:scale-[1.02]">
-                Finalize & Submit
-            </button>
+        <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl">
+            <p class="text-slate-500 text-lg">No assessments found.</p>
+            <p class="text-slate-600 text-sm mt-2">Waiting for students to connect...</p>
         </div>
     </main>
 
+    <!-- Reading Modal -->
+    <div id="view-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+        <div class="bg-slate-900 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-700">
+            <div class="p-6 border-b border-slate-800 flex justify-between items-start">
+                <div>
+                    <h2 id="modal-student-name" class="text-2xl font-bold text-white mb-1">Student Name</h2>
+                    <p id="modal-assignment" class="text-blue-400 font-medium text-sm">Assignment Name</p>
+                </div>
+                <div class="text-right">
+                    <button id="close-modal" class="text-slate-500 hover:text-white transition p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                    <div id="modal-word-count" class="text-slate-400 text-xs font-mono mt-1">0 words</div>
+                </div>
+            </div>
+            
+            <!-- White paper texture background for easy reading -->
+            <div class="p-6 md:p-10 flex-1 overflow-y-auto bg-slate-200">
+                <div id="modal-content" class="paper-texture text-slate-800 w-full min-h-full p-8 rounded-lg shadow-inner whitespace-pre-wrap"></div>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Grade 10 Project Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
             authDomain: "canadian-history-portal.firebaseapp.com",
@@ -139,208 +105,200 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'history-portal-g10';
+        const targetAppId = 'history-portal-g10';
 
-        let firstName = "";
-        let selectedAssignment = "";
-        let hasWarned = false;
-        let isSubmitted = false;
-        let isEntryAuthorized = false;
+        let allSubmissions = [];
 
-        const authOverlay = document.getElementById('auth-overlay');
-        const loginBtn = document.getElementById('login-btn');
-        const writingArea = document.getElementById('writing-area');
-        const saveStatus = document.getElementById('save-status');
-        const statusIndicator = document.getElementById('connection-status');
-        const warningModal = document.getElementById('warning-modal');
-        const lockOverlay = document.getElementById('lock-overlay');
-        const resumeBtn = document.getElementById('resume-btn');
+        // DOM Elements
+        const grid = document.getElementById('student-grid');
+        const activeCountEl = document.getElementById('active-count');
+        const searchInput = document.getElementById('search-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const emptyState = document.getElementById('empty-state');
         
-        // Modal elements
-        const submitModal = document.getElementById('submit-modal');
-        const cancelSubmitBtn = document.getElementById('cancel-submit-btn');
-        const confirmSubmitBtn = document.getElementById('confirm-submit-btn');
-        const submitAssessmentBtn = document.getElementById('submit-assessment-btn');
+        // Modal Elements
+        const modal = document.getElementById('view-modal');
+        const modalName = document.getElementById('modal-student-name');
+        const modalAssignment = document.getElementById('modal-assignment');
+        const modalWordCount = document.getElementById('modal-word-count');
+        const modalContent = document.getElementById('modal-content');
 
-        const enterFullscreen = async () => {
+        // Close modal setup
+        document.getElementById('close-modal').addEventListener('click', () => modal.classList.add('hidden'));
+        modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
+
+        // Initialize connection
+        async function initDashboard() {
             try {
-                const docElm = document.documentElement;
-                if (docElm.requestFullscreen) await docElm.requestFullscreen();
-                else if (docElm.webkitRequestFullScreen) await docElm.webkitRequestFullScreen();
-            } catch (e) { 
-                console.warn("Fullscreen permission denied."); 
-            }
-        };
-
-        document.getElementById('auth-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Your original flow: trigger on click!
-            loginBtn.textContent = "Loading...";
-            firstName = document.getElementById('first-name').value.trim();
-            selectedAssignment = document.getElementById('assignment-input').value.trim();
-            
-            isEntryAuthorized = true;
-            await enterFullscreen();
-            initAuth();
-        });
-
-        document.getElementById('return-login-btn').addEventListener('click', () => {
-            location.reload();
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            submitModal.classList.remove('hidden');
-        });
-        submitAssessmentBtn.addEventListener('click', () => {
-            submitModal.classList.remove('hidden');
-        });
-        cancelSubmitBtn.addEventListener('click', () => {
-            submitModal.classList.add('hidden');
-        });
-        confirmSubmitBtn.addEventListener('click', async () => {
-            submitModal.classList.add('hidden');
-            await forceSubmit();
-        });
-
-        resumeBtn.addEventListener('click', enterFullscreen);
-
-        ['fullscreenchange', 'webkitfullscreenchange'].forEach(evt => {
-            document.addEventListener(evt, () => {
-                const isFull = document.fullscreenElement || document.webkitIsFullScreen;
-                if (!isFull && !isSubmitted && isEntryAuthorized) {
-                    if (!hasWarned) {
-                        warningModal.classList.remove('hidden');
-                        hasWarned = true;
-                    } else {
-                        forceSubmit();
-                    }
-                } else if (isFull) {
-                    warningModal.classList.add('hidden');
-                }
-            });
-        });
-
-        async function forceSubmit() {
-            isSubmitted = true;
-            writingArea.disabled = true;
-            warningModal.classList.add('hidden');
-            lockOverlay.classList.remove('hidden');
-            await saveData(true);
-        }
-
-        const initAuth = async () => {
-            try {
-                if (auth.currentUser) { handleUserEntry(); return; }
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) { 
+                await signInAnonymously(auth);
+                listenToSubmissions();
+            } catch (err) {
                 console.error("Auth Error:", err);
-                saveStatus.textContent = "Auth Error"; 
-                loginBtn.textContent = "Start Assessment";
-            }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            if (user && isEntryAuthorized) handleUserEntry();
-        });
-
-        async function handleUserEntry() {
-            if (!firstName || !selectedAssignment) return;
-            
-            authOverlay.classList.add('hidden');
-            document.getElementById('user-display').textContent = firstName;
-            document.getElementById('header-assignment').textContent = selectedAssignment;
-            statusIndicator.className = "w-3 h-3 rounded-full bg-green-500";
-            writingArea.disabled = false;
-            document.getElementById('submission-controls').classList.remove('hidden');
-            
-            await loadData();
-            
-            // FIX: Immediately trigger a save so the document appears in Firebase right away!
-            if (!isSubmitted) {
-                await saveData(false);
+                loadingIndicator.innerHTML = `<span class="text-red-500">Authentication Failed. Check console.</span>`;
             }
         }
 
-        function getDocId() {
-            const cleanName = firstName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-            const cleanAssign = selectedAssignment.toLowerCase().replace(/[^a-z0-9]/g, '_');
-            return `${cleanAssign}__${cleanName}`;
+        function listenToSubmissions() {
+            const submissionsRef = collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions');
+            
+            onSnapshot(submissionsRef, (snapshot) => {
+                allSubmissions = [];
+                snapshot.forEach(doc => {
+                    allSubmissions.push({ id: doc.id, ...doc.data() });
+                });
+                
+                loadingIndicator.classList.add('hidden');
+                renderGrid();
+            }, (error) => {
+                console.error("Database Error:", error);
+                loadingIndicator.innerHTML = `<span class="text-red-500">Permission Denied. Check Firebase Rules.</span>`;
+            });
         }
 
-        async function loadData() {
-            const id = getDocId();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', id);
+        function formatTimeAgo(isoString) {
+            const date = new Date(isoString);
+            const seconds = Math.floor((new Date() - date) / 1000);
             
-            try {
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    const data = snap.data();
+            if (seconds < 60) return 'Just now';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            return date.toLocaleDateString();
+        }
+
+        function renderGrid() {
+            const searchTerm = searchInput.value.toLowerCase();
+            let activeCount = 0;
+            const now = new Date();
+            
+            grid.innerHTML = '';
+            
+            // Sort by most recently updated
+            const filtered = allSubmissions
+                .filter(sub => {
+                    const searchMatch = (sub.studentName || '').toLowerCase().includes(searchTerm) || 
+                                        (sub.assignment || '').toLowerCase().includes(searchTerm);
+                    return searchMatch;
+                })
+                .sort((a, b) => new Date(b.lastUpdated || 0) - new Date(a.lastUpdated || 0));
+
+            if (filtered.length === 0) {
+                grid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                activeCountEl.innerText = '0';
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+
+            filtered.forEach(sub => {
+                // Determine status
+                let isSubmitted = sub.submitted === true;
+                let lastUpdatedTime = new Date(sub.lastUpdated);
+                let minutesSinceUpdate = (now - lastUpdatedTime) / 60000;
+                
+                // Active if updated in the last 2 minutes and not officially submitted
+                let isActive = !isSubmitted && minutesSinceUpdate < 2;
+                if (isActive) activeCount++;
+
+                let statusColor = isSubmitted ? 'bg-slate-700' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500');
+                let statusText = isSubmitted ? 'LOCKED' : (isActive ? 'TYPING...' : 'IDLE');
+                let borderColor = isSubmitted ? 'border-slate-800' : (isActive ? 'border-emerald-500/30' : 'border-amber-500/30');
+
+                const card = document.createElement('div');
+                card.className = `bg-slate-900 border ${borderColor} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer relative group overflow-hidden`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full ${statusColor}"></div>
+                            <span class="text-[10px] font-black tracking-widest uppercase text-slate-400">${statusText}</span>
+                        </div>
+                        <span class="text-xs font-mono text-slate-500">${formatTimeAgo(sub.lastUpdated)}</span>
+                    </div>
+                    <h3 class="font-bold text-lg text-white mb-1 truncate">${sub.studentName || 'Unknown'}</h3>
+                    <p class="text-xs text-blue-400 font-medium truncate mb-4">${sub.assignment || 'No Assignment'}</p>
                     
-                    if (data.submitted) {
-                        isSubmitted = true;
-                        writingArea.value = data.content || "";
-                        writingArea.disabled = true;
-                        lockOverlay.classList.remove('hidden');
-                        return;
+                    <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-auto">
+                        <div>
+                            <span class="block text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">Word Count</span>
+                            <span class="font-mono font-bold text-white text-lg leading-none">${sub.wordCount || 0}</span>
+                        </div>
+                        <button class="text-xs bg-slate-800 hover:bg-blue-600 text-white px-3 py-1.5 rounded transition opacity-0 group-hover:opacity-100">
+                            Read
+                        </button>
+                    </div>
+                `;
+
+                // Add click listener to open modal
+                card.addEventListener('click', () => {
+                    modalName.innerText = sub.studentName || 'Unknown Student';
+                    modalAssignment.innerText = sub.assignment || 'No Assignment specified';
+                    modalWordCount.innerText = `${sub.wordCount || 0} words`;
+                    
+                    // Fallback text if content is empty
+                    if (!sub.content || sub.content.trim() === '') {
+                        modalContent.innerHTML = `<span class="text-slate-400 italic">No content has been drafted yet.</span>`;
+                    } else {
+                        // Prevent XSS by creating text node
+                        modalContent.textContent = sub.content;
                     }
                     
-                    writingArea.value = data.content || "";
-                }
-                
-                saveStatus.textContent = "Synced";
-                updateWordCount();
-                writingArea.focus();
+                    modal.classList.remove('hidden');
+                });
 
-            } catch (e) { 
-                console.error("Load Error:", e);
-                saveStatus.textContent = "Load Error"; 
-            }
+                grid.appendChild(card);
+            });
+
+            activeCountEl.innerText = activeCount;
         }
 
-        let saveTimer;
-        writingArea.addEventListener('input', () => {
-            if (isSubmitted) return;
+        // Re-render grid when search changes
+        searchInput.addEventListener('input', renderGrid);
+        
+        // Auto-refresh the relative timestamps every minute
+        setInterval(renderGrid, 60000);
+
+        // CSV Export Logic
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (allSubmissions.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+
+            const headers = ['Student Name', 'Assignment', 'Status', 'Word Count', 'Last Updated', 'Content Dump'];
             
-            saveStatus.textContent = "Drafting...";
-            clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => saveData(false), 1000);
+            const rows = allSubmissions.map(sub => {
+                const status = sub.submitted ? 'Submitted' : 'In Progress';
+                // Escape quotes in the content so it doesn't break the CSV
+                const cleanContent = (sub.content || '').replace(/"/g, '""');
+                
+                return [
+                    `"${sub.studentName || ''}"`,
+                    `"${sub.assignment || ''}"`,
+                    `"${status}"`,
+                    sub.wordCount || 0,
+                    `"${new Date(sub.lastUpdated).toLocaleString()}"`,
+                    `"${cleanContent}"`
+                ].join(',');
+            });
+
+            const csvContent = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
             
-            updateWordCount();
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `grade10_history_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         });
 
-        function updateWordCount() {
-            const val = writingArea.value.trim();
-            const words = val ? val.split(/\s+/).length : 0;
-            document.getElementById('word-count').textContent = `${words} words`;
-        }
-
-        async function saveData(final = false) {
-            if (!auth.currentUser || !firstName) return;
-            
-            const id = getDocId();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', id);
-            
-            try {
-                await setDoc(docRef, {
-                    studentName: firstName,
-                    assignment: selectedAssignment,
-                    content: writingArea.value,
-                    lastUpdated: new Date().toISOString(),
-                    wordCount: writingArea.value.trim().split(/\s+/).length,
-                    submitted: final || isSubmitted
-                }, { merge: true });
-                
-                saveStatus.textContent = final ? "LOCKED" : "Saved " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            } catch (e) { 
-                console.error("Sync Error:", e);
-                saveStatus.textContent = "Sync Error"; 
-            }
-        }
+        // Start app
+        initDashboard();
     </script>
 </body>
 </html>
