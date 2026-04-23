@@ -21,6 +21,7 @@
         .paper-texture:focus { outline: none; border-color: #94a3b8; }
         .hidden { display: none !important; }
         
+        /* Fullscreen specific styling */
         :fullscreen body { background-color: white; }
         :-webkit-full-screen body { background-color: white; }
     </style>
@@ -37,7 +38,7 @@
                     </svg>
                 </div>
                 <h2 class="text-2xl font-bold text-gray-800">Secure Writing Portal</h2>
-                <p id="auth-subtitle" class="text-gray-500 text-sm">Entering will activate Fullscreen Focus Mode.</p>
+                <p class="text-gray-500 text-sm">Please enter details to begin the assessment.</p>
             </div>
             
             <form id="auth-form" class="space-y-4">
@@ -94,7 +95,7 @@
         <div class="flex items-center gap-4 sm:gap-6">
             <div id="word-count" class="text-sm font-bold text-gray-700 hidden sm:block">0 words</div>
             <div id="connection-status" class="w-3 h-3 rounded-full bg-gray-300" title="Connection Status"></div>
-            <button id="logout-btn" class="text-xs text-gray-400 hover:text-gray-600 underline">Exit</button>
+            <button id="logout-btn" class="text-xs text-gray-400 hover:text-gray-600 underline">Exit Portal</button>
         </div>
     </header>
 
@@ -133,7 +134,7 @@
         let selectedAssignment = "";
         let hasWarned = false;
         let isSubmitted = false;
-        let isEntryAuthorized = false; // NEW FLAG: Prevents auto-entry on auth change
+        let isEntryAuthorized = false; 
 
         const authOverlay = document.getElementById('auth-overlay');
         const writingArea = document.getElementById('writing-area');
@@ -151,58 +152,63 @@
             if (savedName && savedAssign) {
                 continueBlock.classList.remove('hidden');
                 prevNameSpan.textContent = savedName;
-                // Pre-fill but don't submit
                 document.getElementById('first-name').value = savedName;
                 document.getElementById('assignment-input').value = savedAssign;
             }
         }
         checkExistingSession();
 
-        document.getElementById('clear-session-btn').addEventListener('click', async () => {
+        const enterFullscreen = async () => {
+            try {
+                const docElm = document.documentElement;
+                if (docElm.requestFullscreen) await docElm.requestFullscreen();
+                else if (docElm.webkitRequestFullScreen) await docElm.webkitRequestFullScreen();
+            } catch (e) {
+                console.warn("Fullscreen failed. Ensure this was triggered by a click.");
+            }
+        };
+
+        document.getElementById('clear-session-btn').addEventListener('click', async (e) => {
+            e.preventDefault();
             localStorage.removeItem('hp_name');
             localStorage.removeItem('hp_assignment');
             document.getElementById('first-name').value = "";
             document.getElementById('assignment-input').value = "";
             continueBlock.classList.add('hidden');
-            await signOut(auth);
+            if (auth.currentUser) await signOut(auth);
         });
 
-        document.getElementById('resume-session-btn').addEventListener('click', () => {
+        document.getElementById('resume-session-btn').addEventListener('click', async (e) => {
+            e.preventDefault();
             firstName = localStorage.getItem('hp_name');
             selectedAssignment = localStorage.getItem('hp_assignment');
-            isEntryAuthorized = true; // Manual trigger
-            enterFullscreen();
+            isEntryAuthorized = true; 
+            await enterFullscreen();
             initAuth();
         });
 
-        const enterFullscreen = () => {
-            const docElm = document.documentElement;
-            if (docElm.requestFullscreen) docElm.requestFullscreen();
-            else if (docElm.webkitRequestFullScreen) docElm.webkitRequestFullScreen();
-        };
-
-        document.getElementById('auth-form').addEventListener('submit', (e) => {
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             firstName = document.getElementById('first-name').value.trim();
             selectedAssignment = document.getElementById('assignment-input').value.trim();
             localStorage.setItem('hp_name', firstName);
             localStorage.setItem('hp_assignment', selectedAssignment);
-            isEntryAuthorized = true; // Manual trigger
-            enterFullscreen();
+            isEntryAuthorized = true;
+            await enterFullscreen();
             initAuth();
         });
 
         document.getElementById('return-login-btn').addEventListener('click', async () => {
             localStorage.removeItem('hp_name');
             localStorage.removeItem('hp_assignment');
-            await signOut(auth);
+            if (auth.currentUser) await signOut(auth);
             location.reload();
         });
 
         document.getElementById('logout-btn').addEventListener('click', async () => {
             if (confirm("Are you sure you want to exit? Your progress is saved.")) {
                 isEntryAuthorized = false;
-                await signOut(auth);
+                if (auth.currentUser) await signOut(auth);
                 location.reload();
             }
         });
@@ -234,7 +240,6 @@
         const initAuth = async () => {
             try {
                 if (auth.currentUser) {
-                    // Already logged in from previous session, just trigger the UI update
                     handleUserEntry();
                     return;
                 }
@@ -255,7 +260,7 @@
         });
 
         async function handleUserEntry() {
-            if (!firstName || !selectedAssignment) return;
+            if (!firstName || !selectedAssignment || !isEntryAuthorized) return;
             
             authOverlay.classList.add('hidden');
             document.getElementById('user-display').textContent = firstName;
