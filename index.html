@@ -227,6 +227,7 @@
                     await signInAnonymously(auth);
                 }
             } catch (err) { 
+                console.error("Auth Error:", err);
                 saveStatus.textContent = "Auth Error"; 
                 loginBtn.textContent = "Start Assessment";
             }
@@ -246,6 +247,11 @@
             writingArea.disabled = false;
             
             await loadData();
+            
+            // FIX: Immediately trigger a save so the document appears in Firebase right away!
+            if (!isSubmitted) {
+                await saveData(false);
+            }
         }
 
         function getDocId() {
@@ -279,6 +285,7 @@
                 writingArea.focus();
 
             } catch (e) { 
+                console.error("Load Error:", e);
                 saveStatus.textContent = "Load Error"; 
             }
         }
@@ -318,6 +325,7 @@
                 
                 saveStatus.textContent = final ? "LOCKED" : "Saved " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
             } catch (e) { 
+                console.error("Sync Error:", e);
                 saveStatus.textContent = "Sync Error"; 
             }
         }
