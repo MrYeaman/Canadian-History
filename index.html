@@ -21,7 +21,6 @@
         .paper-texture:focus { outline: none; border-color: #94a3b8; }
         .hidden { display: none !important; }
         
-        /* Fullscreen specific styling */
         :fullscreen body { background-color: white; }
         :-webkit-full-screen body { background-color: white; }
     </style>
@@ -78,7 +77,7 @@
             </div>
             <h2 class="text-3xl font-bold text-gray-800">Assignment Submitted</h2>
             <p class="text-gray-500 mt-2">Your work has been finalized and sent to the teacher.</p>
-            <button onclick="location.reload()" class="mt-8 text-blue-600 underline">Return to Login</button>
+            <button id="return-login-btn" class="mt-8 text-blue-600 underline">Return to Login</button>
         </div>
     </div>
 
@@ -134,6 +133,7 @@
         let selectedAssignment = "";
         let hasWarned = false;
         let isSubmitted = false;
+        let isEntryAuthorized = false; // NEW FLAG: Prevents auto-entry on auth change
 
         const authOverlay = document.getElementById('auth-overlay');
         const writingArea = document.getElementById('writing-area');
@@ -145,30 +145,32 @@
         const continueBlock = document.getElementById('continue-block');
         const prevNameSpan = document.getElementById('prev-name');
 
-        // Check for existing session on load
         function checkExistingSession() {
             const savedName = localStorage.getItem('hp_name');
             const savedAssign = localStorage.getItem('hp_assignment');
             if (savedName && savedAssign) {
                 continueBlock.classList.remove('hidden');
                 prevNameSpan.textContent = savedName;
+                // Pre-fill but don't submit
                 document.getElementById('first-name').value = savedName;
                 document.getElementById('assignment-input').value = savedAssign;
             }
         }
         checkExistingSession();
 
-        document.getElementById('clear-session-btn').addEventListener('click', () => {
+        document.getElementById('clear-session-btn').addEventListener('click', async () => {
             localStorage.removeItem('hp_name');
             localStorage.removeItem('hp_assignment');
             document.getElementById('first-name').value = "";
             document.getElementById('assignment-input').value = "";
             continueBlock.classList.add('hidden');
+            await signOut(auth);
         });
 
         document.getElementById('resume-session-btn').addEventListener('click', () => {
             firstName = localStorage.getItem('hp_name');
             selectedAssignment = localStorage.getItem('hp_assignment');
+            isEntryAuthorized = true; // Manual trigger
             enterFullscreen();
             initAuth();
         });
@@ -185,12 +187,21 @@
             selectedAssignment = document.getElementById('assignment-input').value.trim();
             localStorage.setItem('hp_name', firstName);
             localStorage.setItem('hp_assignment', selectedAssignment);
+            isEntryAuthorized = true; // Manual trigger
             enterFullscreen();
             initAuth();
         });
 
+        document.getElementById('return-login-btn').addEventListener('click', async () => {
+            localStorage.removeItem('hp_name');
+            localStorage.removeItem('hp_assignment');
+            await signOut(auth);
+            location.reload();
+        });
+
         document.getElementById('logout-btn').addEventListener('click', async () => {
             if (confirm("Are you sure you want to exit? Your progress is saved.")) {
+                isEntryAuthorized = false;
                 await signOut(auth);
                 location.reload();
             }
@@ -204,7 +215,7 @@
 
         async function handleFullscreenExit() {
             const isFull = document.fullscreenElement || document.webkitIsFullScreen;
-            if (!isFull && !isSubmitted && firstName) {
+            if (!isFull && !isSubmitted && isEntryAuthorized) {
                 if (!hasWarned) {
                     warningModal.classList.remove('hidden');
                     hasWarned = true;
@@ -222,6 +233,11 @@
 
         const initAuth = async () => {
             try {
+                if (auth.currentUser) {
+                    // Already logged in from previous session, just trigger the UI update
+                    handleUserEntry();
+                    return;
+                }
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
@@ -232,17 +248,23 @@
             }
         };
 
-        onAuthStateChanged(auth, async (user) => {
-            if (user && firstName && selectedAssignment) {
-                authOverlay.classList.add('hidden');
-                document.getElementById('user-display').textContent = firstName;
-                document.getElementById('header-assignment').textContent = selectedAssignment;
-                statusIndicator.classList.remove('bg-gray-300');
-                statusIndicator.classList.add('bg-green-500');
-                writingArea.disabled = false;
-                loadData();
+        onAuthStateChanged(auth, (user) => {
+            if (user && isEntryAuthorized) {
+                handleUserEntry();
             }
         });
+
+        async function handleUserEntry() {
+            if (!firstName || !selectedAssignment) return;
+            
+            authOverlay.classList.add('hidden');
+            document.getElementById('user-display').textContent = firstName;
+            document.getElementById('header-assignment').textContent = selectedAssignment;
+            statusIndicator.classList.remove('bg-gray-300');
+            statusIndicator.classList.add('bg-green-500');
+            writingArea.disabled = false;
+            await loadData();
+        }
 
         function getStorageId() {
             const cleanName = firstName.toLowerCase().replace(/[^a-z0-9]/g, '_');
