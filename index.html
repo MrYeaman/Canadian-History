@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>History Class: Writing Portal</title>
+    <title>Grade 10 History Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap');
@@ -21,7 +21,6 @@
         .paper-texture:focus { outline: none; border-color: #94a3b8; }
         .hidden { display: none !important; }
         
-        /* Fullscreen specific styling */
         :fullscreen body { background-color: white; }
         :-webkit-full-screen body { background-color: white; }
     </style>
@@ -37,18 +36,18 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-800">Secure Writing Portal</h2>
-                <p class="text-gray-500 text-sm">Please enter details to begin the assessment.</p>
+                <h2 class="text-2xl font-bold text-gray-800">Grade 10 History Portal</h2>
+                <p class="text-gray-500 text-sm">Enter your details to begin the secure assessment.</p>
             </div>
             
             <form id="auth-form" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assignment Title</label>
-                    <input type="text" id="assignment-input" placeholder="e.g. Confederation Analysis" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base">
+                    <input type="text" id="assignment-input" placeholder="e.g. World War II Analysis" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Your Name</label>
-                    <input type="text" id="first-name" placeholder="Full Name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Full Name</label>
+                    <input type="text" id="first-name" placeholder="First & Last Name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">Start Assessment</button>
             </form>
@@ -56,7 +55,7 @@
             <div id="continue-block" class="mt-6 pt-6 border-t border-gray-100 hidden text-center">
                 <p class="text-sm text-gray-500 mb-3">Previous session found:</p>
                 <button id="resume-session-btn" class="text-blue-600 font-bold hover:underline mb-2 block w-full">Resume as <span id="prev-name"></span></button>
-                <button id="clear-session-btn" class="text-xs text-red-400 hover:text-red-600 underline">Switch User or New Assignment</button>
+                <button id="clear-session-btn" class="text-xs text-red-400 hover:text-red-600 underline">Start New Session</button>
             </div>
         </div>
     </div>
@@ -64,21 +63,21 @@
     <!-- Exit Warning Modal -->
     <div id="warning-modal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-xl max-w-sm w-full p-6 text-center">
-            <h3 class="text-xl font-bold text-red-600 mb-2">Warning!</h3>
-            <p class="text-gray-600 mb-6">Exiting fullscreen will automatically submit your assignment. Please return to fullscreen immediately.</p>
-            <button id="resume-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Return to Fullscreen</button>
+            <h3 class="text-xl font-bold text-red-600 mb-2">Security Warning</h3>
+            <p class="text-gray-600 mb-6 text-sm">Attempting to leave the portal is prohibited. Your next violation will result in an automatic submission of your work.</p>
+            <button id="resume-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Return to Assessment</button>
         </div>
     </div>
 
     <!-- Final Submission Blocked Overlay -->
-    <div id="lock-overlay" class="fixed inset-0 bg-white z-[70] flex items-center justify-center p-4 hidden">
-        <div class="text-center">
+    <div id="lock-overlay" class="fixed inset-0 bg-white z-[70] flex items-center justify-center p-4 hidden text-center">
+        <div>
             <div class="text-green-500 mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <h2 class="text-3xl font-bold text-gray-800">Assignment Submitted</h2>
-            <p class="text-gray-500 mt-2">Your work has been finalized and sent to the teacher.</p>
-            <button id="return-login-btn" class="mt-8 text-blue-600 underline">Return to Login</button>
+            <p class="text-gray-500 mt-2">Your work has been locked and sent to the teacher.</p>
+            <button id="return-login-btn" class="mt-8 text-blue-600 underline">Return to Start</button>
         </div>
     </div>
 
@@ -88,7 +87,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
             </div>
             <div>
-                <h1 id="header-assignment" class="font-bold text-gray-800 leading-tight text-sm sm:text-base">Assignment</h1>
+                <h1 id="header-assignment" class="font-bold text-gray-800 leading-tight text-sm sm:text-base">Loading...</h1>
                 <p id="user-display" class="text-xs text-blue-600 font-semibold italic">Not signed in</p>
             </div>
         </div>
@@ -101,11 +100,11 @@
 
     <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-10">
         <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg shadow-sm">
-            <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 text-lg">Assignment Instructions</h2>
-            <p id="prompt-desc" class="text-blue-800 text-sm italic">Focus Mode Active. Exiting fullscreen or navigating away will automatically submit your work.</p>
+            <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 text-lg">Secure Writing Mode</h2>
+            <p id="prompt-desc" class="text-blue-800 text-sm italic">Assessment is active. Do not switch tabs or exit fullscreen until finished.</p>
         </div>
         <div class="relative">
-            <textarea id="writing-area" class="paper-texture w-full min-h-[650px] p-6 md:p-10 rounded-lg resize-none overflow-y-auto" placeholder="Start writing here..." disabled></textarea>
+            <textarea id="writing-area" class="paper-texture w-full min-h-[650px] p-6 md:p-10 rounded-lg resize-none overflow-y-auto" placeholder="Start typing your response here..." disabled></textarea>
             <div id="save-status" class="absolute bottom-4 right-6 text-xs text-gray-400 italic">Connecting...</div>
         </div>
     </main>
@@ -115,17 +114,8 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const manualConfig = {
-            apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
-            authDomain: "canadian-history-portal.firebaseapp.com",
-            projectId: "canadian-history-portal",
-            storageBucket: "canadian-history-portal.firebasestorage.app",
-            messagingSenderId: "21075780226",
-            appId: "1:21075780226:web:7b6d9b938e7bedb9e80a9b"
-        };
-
-        const activeConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
-        const app = initializeApp(activeConfig);
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'history-portal-g10';
@@ -134,7 +124,7 @@
         let selectedAssignment = "";
         let hasWarned = false;
         let isSubmitted = false;
-        let isEntryAuthorized = false; 
+        let isEntryAuthorized = false;
 
         const authOverlay = document.getElementById('auth-overlay');
         const writingArea = document.getElementById('writing-area');
@@ -163,15 +153,12 @@
                 const docElm = document.documentElement;
                 if (docElm.requestFullscreen) await docElm.requestFullscreen();
                 else if (docElm.webkitRequestFullScreen) await docElm.webkitRequestFullScreen();
-            } catch (e) {
-                console.warn("Fullscreen failed. Ensure this was triggered by a click.");
-            }
+            } catch (e) { console.warn("Fullscreen permission denied."); }
         };
 
         document.getElementById('clear-session-btn').addEventListener('click', async (e) => {
             e.preventDefault();
-            localStorage.removeItem('hp_name');
-            localStorage.removeItem('hp_assignment');
+            localStorage.clear();
             document.getElementById('first-name').value = "";
             document.getElementById('assignment-input').value = "";
             continueBlock.classList.add('hidden');
@@ -182,7 +169,7 @@
             e.preventDefault();
             firstName = localStorage.getItem('hp_name');
             selectedAssignment = localStorage.getItem('hp_assignment');
-            isEntryAuthorized = true; 
+            isEntryAuthorized = true;
             await enterFullscreen();
             initAuth();
         });
@@ -198,17 +185,14 @@
             initAuth();
         });
 
-        document.getElementById('return-login-btn').addEventListener('click', async () => {
-            localStorage.removeItem('hp_name');
-            localStorage.removeItem('hp_assignment');
-            if (auth.currentUser) await signOut(auth);
+        document.getElementById('return-login-btn').addEventListener('click', () => {
+            localStorage.clear();
             location.reload();
         });
 
-        document.getElementById('logout-btn').addEventListener('click', async () => {
-            if (confirm("Are you sure you want to exit? Your progress is saved.")) {
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            if (confirm("Exit the portal? Your current draft is saved.")) {
                 isEntryAuthorized = false;
-                if (auth.currentUser) await signOut(auth);
                 location.reload();
             }
         });
@@ -216,107 +200,98 @@
         resumeBtn.addEventListener('click', enterFullscreen);
 
         ['fullscreenchange', 'webkitfullscreenchange'].forEach(evt => {
-            document.addEventListener(evt, handleFullscreenExit);
+            document.addEventListener(evt, () => {
+                const isFull = document.fullscreenElement || document.webkitIsFullScreen;
+                if (!isFull && !isSubmitted && isEntryAuthorized) {
+                    if (!hasWarned) {
+                        warningModal.classList.remove('hidden');
+                        hasWarned = true;
+                    } else {
+                        forceSubmit();
+                    }
+                } else if (isFull) {
+                    warningModal.classList.add('hidden');
+                }
+            });
         });
 
-        async function handleFullscreenExit() {
-            const isFull = document.fullscreenElement || document.webkitIsFullScreen;
-            if (!isFull && !isSubmitted && isEntryAuthorized) {
-                if (!hasWarned) {
-                    warningModal.classList.remove('hidden');
-                    hasWarned = true;
-                } else {
-                    isSubmitted = true;
-                    writingArea.disabled = true;
-                    warningModal.classList.add('hidden');
-                    lockOverlay.classList.remove('hidden');
-                    await saveData(true);
-                }
-            } else if (isFull) {
-                warningModal.classList.add('hidden');
-            }
+        async function forceSubmit() {
+            isSubmitted = true;
+            writingArea.disabled = true;
+            warningModal.classList.add('hidden');
+            lockOverlay.classList.remove('hidden');
+            await saveData(true);
         }
 
         const initAuth = async () => {
             try {
-                if (auth.currentUser) {
-                    handleUserEntry();
-                    return;
-                }
+                if (auth.currentUser) { handleUserEntry(); return; }
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (error) {
-                saveStatus.textContent = "Auth Error";
-            }
+            } catch (err) { saveStatus.textContent = "Auth Error"; }
         };
 
         onAuthStateChanged(auth, (user) => {
-            if (user && isEntryAuthorized) {
-                handleUserEntry();
-            }
+            if (user && isEntryAuthorized) handleUserEntry();
         });
 
         async function handleUserEntry() {
-            if (!firstName || !selectedAssignment || !isEntryAuthorized) return;
-            
+            if (!firstName || !selectedAssignment) return;
             authOverlay.classList.add('hidden');
             document.getElementById('user-display').textContent = firstName;
             document.getElementById('header-assignment').textContent = selectedAssignment;
-            statusIndicator.classList.remove('bg-gray-300');
-            statusIndicator.classList.add('bg-green-500');
+            statusIndicator.className = "w-3 h-3 rounded-full bg-green-500";
             writingArea.disabled = false;
             await loadData();
         }
 
-        function getStorageId() {
+        function getDocId() {
             const cleanName = firstName.toLowerCase().replace(/[^a-z0-9]/g, '_');
             const cleanAssign = selectedAssignment.toLowerCase().replace(/[^a-z0-9]/g, '_');
             return `${cleanAssign}__${cleanName}`;
         }
 
         async function loadData() {
-            const docId = getStorageId();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', docId);
+            const id = getDocId();
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', id);
             try {
                 const snap = await getDoc(docRef);
                 if (snap.exists()) {
-                    if (snap.data().submitted) {
+                    const data = snap.data();
+                    writingArea.value = data.content || "";
+                    if (data.submitted) {
                         isSubmitted = true;
-                        writingArea.value = snap.data().content || "";
                         writingArea.disabled = true;
                         lockOverlay.classList.remove('hidden');
-                    } else {
-                        writingArea.value = snap.data().content || "";
                     }
                 }
-                saveStatus.textContent = "Last sync: Just now";
+                saveStatus.textContent = "Synced";
                 updateWordCount();
-            } catch (e) {
-                saveStatus.textContent = "Error loading";
-            }
+            } catch (e) { saveStatus.textContent = "Load Error"; }
         }
 
-        let timer;
+        let saveTimer;
         writingArea.addEventListener('input', () => {
             if (isSubmitted) return;
-            saveStatus.textContent = "Typing...";
-            clearTimeout(timer);
-            timer = setTimeout(saveData, 1000);
+            saveStatus.textContent = "Drafting...";
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(saveData, 1000);
             updateWordCount();
         });
 
         function updateWordCount() {
-            const words = writingArea.value.trim() ? writingArea.value.trim().split(/\s+/).length : 0;
+            const val = writingArea.value.trim();
+            const words = val ? val.split(/\s+/).length : 0;
             document.getElementById('word-count').textContent = `${words} words`;
         }
 
         async function saveData(final = false) {
-            if (!auth.currentUser || !firstName || (isSubmitted && !final)) return;
-            const docId = getStorageId();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', docId);
+            if (!auth.currentUser || !firstName) return;
+            const id = getDocId();
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', id);
             try {
                 await setDoc(docRef, {
                     studentName: firstName,
@@ -326,10 +301,8 @@
                     wordCount: writingArea.value.trim().split(/\s+/).length,
                     submitted: final || isSubmitted
                 }, { merge: true });
-                saveStatus.textContent = final ? "SUBMITTED" : "Saved: " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            } catch (e) {
-                saveStatus.textContent = "Save Error";
-            }
+                saveStatus.textContent = final ? "LOCKED" : "Saved " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            } catch (e) { saveStatus.textContent = "Sync Error"; }
         }
     </script>
 </body>
