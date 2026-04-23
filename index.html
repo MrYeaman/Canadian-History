@@ -38,8 +38,9 @@
                     </svg>
                 </div>
                 <h2 class="text-2xl font-bold text-gray-800">Secure Writing Portal</h2>
-                <p class="text-gray-500 text-sm">Entering will activate Fullscreen Focus Mode.</p>
+                <p id="auth-subtitle" class="text-gray-500 text-sm">Entering will activate Fullscreen Focus Mode.</p>
             </div>
+            
             <form id="auth-form" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assignment Title</label>
@@ -51,6 +52,12 @@
                 </div>
                 <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">Start Assessment</button>
             </form>
+
+            <div id="continue-block" class="mt-6 pt-6 border-t border-gray-100 hidden text-center">
+                <p class="text-sm text-gray-500 mb-3">Previous session found:</p>
+                <button id="resume-session-btn" class="text-blue-600 font-bold hover:underline mb-2 block w-full">Resume as <span id="prev-name"></span></button>
+                <button id="clear-session-btn" class="text-xs text-red-400 hover:text-red-600 underline">Switch User or New Assignment</button>
+            </div>
         </div>
     </div>
 
@@ -70,7 +77,8 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <h2 class="text-3xl font-bold text-gray-800">Assignment Submitted</h2>
-            <p class="text-gray-500 mt-2">Fullscreen was exited. Your work has been finalized and sent to the teacher.</p>
+            <p class="text-gray-500 mt-2">Your work has been finalized and sent to the teacher.</p>
+            <button onclick="location.reload()" class="mt-8 text-blue-600 underline">Return to Login</button>
         </div>
     </div>
 
@@ -80,33 +88,33 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
             </div>
             <div>
-                <h1 id="header-assignment" class="font-bold text-gray-800 leading-tight">Assignment</h1>
+                <h1 id="header-assignment" class="font-bold text-gray-800 leading-tight text-sm sm:text-base">Assignment</h1>
                 <p id="user-display" class="text-xs text-blue-600 font-semibold italic">Not signed in</p>
             </div>
         </div>
-        <div class="flex items-center gap-6">
+        <div class="flex items-center gap-4 sm:gap-6">
             <div id="word-count" class="text-sm font-bold text-gray-700 hidden sm:block">0 words</div>
             <div id="connection-status" class="w-3 h-3 rounded-full bg-gray-300" title="Connection Status"></div>
+            <button id="logout-btn" class="text-xs text-gray-400 hover:text-gray-600 underline">Exit</button>
         </div>
     </header>
 
-    <main class="flex-1 max-w-4xl w-full mx-auto p-6 md:p-10">
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-10">
         <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg shadow-sm">
             <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 text-lg">Assignment Instructions</h2>
             <p id="prompt-desc" class="text-blue-800 text-sm italic">Focus Mode Active. Exiting fullscreen or navigating away will automatically submit your work.</p>
         </div>
         <div class="relative">
-            <textarea id="writing-area" class="paper-texture w-full min-h-[650px] p-10 rounded-lg resize-none overflow-y-auto" placeholder="Start writing here..." disabled></textarea>
+            <textarea id="writing-area" class="paper-texture w-full min-h-[650px] p-6 md:p-10 rounded-lg resize-none overflow-y-auto" placeholder="Start writing here..." disabled></textarea>
             <div id="save-status" class="absolute bottom-4 right-6 text-xs text-gray-400 italic">Connecting...</div>
         </div>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- FIREBASE CONFIGURATION ---
         const manualConfig = {
             apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
             authDomain: "canadian-history-portal.firebaseapp.com",
@@ -116,17 +124,14 @@
             appId: "1:21075780226:web:7b6d9b938e7bedb9e80a9b"
         };
 
-        const activeConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : manualConfig;
-
+        const activeConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
         const app = initializeApp(activeConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'history-portal-g10';
 
-        let firstName = localStorage.getItem('hp_name');
-        let selectedAssignment = localStorage.getItem('hp_assignment');
+        let firstName = "";
+        let selectedAssignment = "";
         let hasWarned = false;
         let isSubmitted = false;
 
@@ -137,51 +142,80 @@
         const warningModal = document.getElementById('warning-modal');
         const lockOverlay = document.getElementById('lock-overlay');
         const resumeBtn = document.getElementById('resume-btn');
+        const continueBlock = document.getElementById('continue-block');
+        const prevNameSpan = document.getElementById('prev-name');
 
-        // Fullscreen Logic
+        // Check for existing session on load
+        function checkExistingSession() {
+            const savedName = localStorage.getItem('hp_name');
+            const savedAssign = localStorage.getItem('hp_assignment');
+            if (savedName && savedAssign) {
+                continueBlock.classList.remove('hidden');
+                prevNameSpan.textContent = savedName;
+                document.getElementById('first-name').value = savedName;
+                document.getElementById('assignment-input').value = savedAssign;
+            }
+        }
+        checkExistingSession();
+
+        document.getElementById('clear-session-btn').addEventListener('click', () => {
+            localStorage.removeItem('hp_name');
+            localStorage.removeItem('hp_assignment');
+            document.getElementById('first-name').value = "";
+            document.getElementById('assignment-input').value = "";
+            continueBlock.classList.add('hidden');
+        });
+
+        document.getElementById('resume-session-btn').addEventListener('click', () => {
+            firstName = localStorage.getItem('hp_name');
+            selectedAssignment = localStorage.getItem('hp_assignment');
+            enterFullscreen();
+            initAuth();
+        });
+
         const enterFullscreen = () => {
             const docElm = document.documentElement;
             if (docElm.requestFullscreen) docElm.requestFullscreen();
-            else if (docElm.mozRequestFullScreen) docElm.mozRequestFullScreen();
             else if (docElm.webkitRequestFullScreen) docElm.webkitRequestFullScreen();
-            else if (docElm.msRequestFullscreen) docElm.msRequestFullscreen();
         };
 
         document.getElementById('auth-form').addEventListener('submit', (e) => {
             e.preventDefault();
             firstName = document.getElementById('first-name').value.trim();
             selectedAssignment = document.getElementById('assignment-input').value.trim();
-            
             localStorage.setItem('hp_name', firstName);
             localStorage.setItem('hp_assignment', selectedAssignment);
-            
             enterFullscreen();
             initAuth();
         });
 
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            if (confirm("Are you sure you want to exit? Your progress is saved.")) {
+                await signOut(auth);
+                location.reload();
+            }
+        });
+
         resumeBtn.addEventListener('click', enterFullscreen);
 
-        document.addEventListener('fullscreenchange', handleFullscreenExit);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenExit);
-        document.addEventListener('mozfullscreenchange', handleFullscreenExit);
-        document.addEventListener('MSFullscreenChange', handleFullscreenExit);
+        ['fullscreenchange', 'webkitfullscreenchange'].forEach(evt => {
+            document.addEventListener(evt, handleFullscreenExit);
+        });
 
         async function handleFullscreenExit() {
-            if (!document.fullscreenElement && !document.webkitIsFullScreen && !document.mozFullScreen && !document.msFullscreenElement) {
-                if (isSubmitted) return;
-
+            const isFull = document.fullscreenElement || document.webkitIsFullScreen;
+            if (!isFull && !isSubmitted && firstName) {
                 if (!hasWarned) {
                     warningModal.classList.remove('hidden');
                     hasWarned = true;
                 } else {
-                    // Second exit - Auto Submit and Lock
                     isSubmitted = true;
                     writingArea.disabled = true;
                     warningModal.classList.add('hidden');
                     lockOverlay.classList.remove('hidden');
-                    await saveData(true); // Final save
+                    await saveData(true);
                 }
-            } else {
+            } else if (isFull) {
                 warningModal.classList.add('hidden');
             }
         }
@@ -194,8 +228,7 @@
                     await signInAnonymously(auth);
                 }
             } catch (error) {
-                console.error("Auth Error:", error);
-                saveStatus.textContent = "Connection Error. Check Firebase Config.";
+                saveStatus.textContent = "Auth Error";
             }
         };
 
@@ -204,10 +237,8 @@
                 authOverlay.classList.add('hidden');
                 document.getElementById('user-display').textContent = firstName;
                 document.getElementById('header-assignment').textContent = selectedAssignment;
-                
                 statusIndicator.classList.remove('bg-gray-300');
                 statusIndicator.classList.add('bg-green-500');
-                
                 writingArea.disabled = false;
                 loadData();
             }
@@ -237,8 +268,7 @@
                 saveStatus.textContent = "Last sync: Just now";
                 updateWordCount();
             } catch (e) {
-                console.error("Load error:", e);
-                saveStatus.textContent = "Error loading data";
+                saveStatus.textContent = "Error loading";
             }
         }
 
@@ -260,7 +290,6 @@
             if (!auth.currentUser || !firstName || (isSubmitted && !final)) return;
             const docId = getStorageId();
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', docId);
-            
             try {
                 await setDoc(docRef, {
                     studentName: firstName,
@@ -270,15 +299,10 @@
                     wordCount: writingArea.value.trim().split(/\s+/).length,
                     submitted: final || isSubmitted
                 }, { merge: true });
-                saveStatus.textContent = final ? "FINAL SUBMISSION SAVED" : "Cloud saved: " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                saveStatus.textContent = final ? "SUBMITTED" : "Saved: " + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
             } catch (e) {
-                console.error("Save error:", e);
-                saveStatus.textContent = "Offline / Save Error";
+                saveStatus.textContent = "Save Error";
             }
-        }
-
-        if (firstName && selectedAssignment) {
-            initAuth();
         }
     </script>
 </body>
