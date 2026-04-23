@@ -49,8 +49,8 @@
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Full Name</label>
                     <input type="text" id="first-name" placeholder="First & Last Name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
                 </div>
-                <button type="submit" id="login-btn" disabled class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    Connecting to Secure Server...
+                <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                    Start Assessment
                 </button>
             </form>
         </div>
@@ -124,22 +124,7 @@
 
         let app, auth, db;
         let isFirebaseActive = false;
-
-        try {
-            // Safely check for the environment variable so it doesn't crash outside the platform sandbox
-            const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-            if (configStr) {
-                const firebaseConfig = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                isFirebaseActive = true;
-            } else {
-                console.warn("No Firebase configuration found. Running in local mode.");
-            }
-        } catch (e) {
-            console.error("Firebase initialization error:", e);
-        }
+        let authSettled = false;
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'history-portal-g10';
 
@@ -166,44 +151,46 @@
 
         // Initialize Authentication on load
         const initAuth = async () => {
-            if (!isFirebaseActive) {
-                currentUser = { uid: 'local-offline-user' };
-                loginBtn.disabled = false;
-                loginBtn.textContent = "Start Assessment (Local Mode)";
-                return;
-            }
-
+            // Prevent infinite network hangs with a strict 4-second timeout
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth Timeout")), 4000));
+            
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+                if (!configStr) throw new Error("No config found");
+
+                const firebaseConfig = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                const authPromise = (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) 
+                    ? signInWithCustomToken(auth, __initial_auth_token) 
+                    : signInAnonymously(auth);
+
+                await Promise.race([authPromise, timeout]);
+
+                currentUser = auth.currentUser;
+                isFirebaseActive = !!currentUser;
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUser = user;
+                        isFirebaseActive = true;
+                    }
+                });
+
+            } catch (e) {
+                console.warn("Using offline mode:", e.message);
+                isFirebaseActive = false;
+                currentUser = { uid: 'offline-user' };
+            } finally {
+                authSettled = true;
+                if (loginBtn && !loginBtn.disabled) {
+                    loginBtn.textContent = "Start Assessment";
                 }
-            } catch (err) { 
-                console.error("Auth init error:", err);
-                // Fallback to allow progress if auth is entirely blocked by the network/browser
-                currentUser = { uid: 'fallback-user' };
-                isFirebaseActive = false; 
-                loginBtn.disabled = false;
-                loginBtn.textContent = "Start Assessment (Offline Mode)";
             }
         };
         initAuth();
-
-        if (isFirebaseActive) {
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUser = user;
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = "Start Assessment";
-                    
-                    // If they previously authorized but auth state took a moment to resolve
-                    if (isEntryAuthorized) {
-                        handleUserEntry();
-                    }
-                }
-            });
-        }
 
         const enterFullscreen = async () => {
             try {
@@ -217,7 +204,22 @@
 
         document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!currentUser) return; // Guard clause
+
+            loginBtn.textContent = "Loading...";
+            loginBtn.disabled = true;
+
+            // Wait up to 5 seconds if auth is still settling in the background
+            let waitCycles = 0;
+            while (!authSettled && waitCycles < 20) {
+                await new Promise(r => setTimeout(r, 250));
+                waitCycles++;
+            }
+
+            if (!authSettled || !currentUser) {
+                authSettled = true;
+                isFirebaseActive = false;
+                currentUser = { uid: 'offline-user' };
+            }
 
             firstName = document.getElementById('first-name').value.trim();
             selectedAssignment = document.getElementById('assignment-input').value.trim();
