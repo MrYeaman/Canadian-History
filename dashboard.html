@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grade 10 History - Teacher Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Include JSZip for bundling files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap');
         
@@ -58,13 +60,18 @@
                 <p class="text-slate-500 font-medium tracking-wide mt-1">Grade 10 History Portal: Live Monitoring</p>
             </div>
             
-            <div class="flex flex-wrap items-end gap-4 w-full md:w-auto">
+            <div class="flex flex-wrap items-end gap-3 w-full md:w-auto">
                 <div class="flex-1 min-w-[200px]">
                     <input type="text" id="search-input" placeholder="Search by name or assignment..." class="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm">
                 </div>
-                <button id="export-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-bold transition flex items-center gap-2 shadow-lg text-sm h-[38px]">
-                    Export CSV
-                </button>
+                <div class="flex gap-2">
+                    <button id="export-btn" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 shadow-lg text-sm h-[38px] border border-slate-700" title="Export Data to CSV">
+                        CSV
+                    </button>
+                    <button id="download-zip-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-bold transition flex items-center gap-2 shadow-lg text-sm h-[38px]" title="Download all essays as a ZIP of text files">
+                        Download ZIP
+                    </button>
+                </div>
                 <div class="bg-slate-900 px-6 py-1.5 rounded-lg border border-slate-800 text-center h-[38px] flex flex-col justify-center">
                     <span class="text-[9px] text-slate-500 block uppercase font-black tracking-widest leading-none mb-0.5">Active Writers</span>
                     <span id="active-count" class="text-xl font-mono font-bold text-emerald-400 leading-none">0</span>
@@ -155,7 +162,6 @@
             unlockDashboard();
         }
 
-        // Clear error as soon as user types
         accessInput.addEventListener('input', () => {
             loginError.classList.add('hidden');
         });
@@ -303,6 +309,49 @@
         searchInput.addEventListener('input', renderGrid);
         setInterval(renderGrid, 60000);
 
+        // ZIP DOWNLOAD LOGIC
+        document.getElementById('download-zip-btn').addEventListener('click', async () => {
+            if (allSubmissions.length === 0) return alert("No assessments to download.");
+            
+            const zip = new JSZip();
+            const dateStr = new Date().toISOString().split('T')[0];
+            const folderName = `Grade_10_History_Portals_${dateStr}`;
+            const folder = zip.folder(folderName);
+
+            allSubmissions.forEach(sub => {
+                const safeName = (sub.studentName || 'Unknown').replace(/[^a-z0-9]/gi, '_');
+                const safeAssign = (sub.assignment || 'No_Title').replace(/[^a-z0-9]/gi, '_');
+                const filename = `${safeName} - ${safeAssign}.txt`;
+                
+                const fileContent = 
+`=========================================================
+STUDENT: ${sub.studentName || 'Unknown'}
+ASSIGNMENT: ${sub.assignment || 'N/A'}
+WORD COUNT: ${sub.wordCount || 0}
+STATUS: ${sub.submitted ? 'FINAL SUBMISSION (LOCKED)' : 'IN-PROGRESS DRAFT'}
+LAST UPDATED: ${new Date(sub.lastUpdated).toLocaleString()}
+=========================================================
+
+${sub.content || '(Empty Response)'}
+
+=========================================================
+End of Response`;
+
+                folder.file(filename, fileContent);
+            });
+
+            const content = await zip.generateAsync({type: "blob"});
+            const url = window.URL.createObjectURL(content);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${folderName}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        });
+
+        // CSV EXPORT LOGIC
         document.getElementById('export-btn').addEventListener('click', () => {
             if (allSubmissions.length === 0) return alert("No data to export.");
             const headers = ['Student Name', 'Assignment', 'Status', 'Word Count', 'Last Updated', 'Content'];
@@ -318,7 +367,7 @@
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `grade10_history_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `grade10_history_summary_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
         });
 
