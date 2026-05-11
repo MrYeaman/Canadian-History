@@ -52,6 +52,7 @@
         .gradebook-table tr:hover { @apply bg-slate-900/50; }
 
         .blur-bg { backdrop-filter: blur(12px); }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen p-4 md:p-8">
@@ -127,32 +128,48 @@
         <div class="bg-slate-900 rounded-xl w-full max-w-6xl max-h-[95vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
             <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                 <div class="flex-1">
-                    <h2 id="modal-student-name" class="text-xl font-bold text-white">Student Name</h2>
+                    <h2 id="modal-student-name" class="text-xl font-bold text-white leading-tight">Student Name</h2>
                     <p id="modal-assignment" class="text-blue-400 font-medium text-xs">Assignment</p>
                 </div>
+                
                 <div class="flex items-center gap-4">
+                    <!-- Delete UI -->
+                    <div id="delete-confirm-ui" class="hidden flex items-center gap-2 bg-red-900/20 border border-red-500/50 p-1 rounded-lg">
+                        <span class="text-[10px] font-bold text-red-400 px-2 uppercase">Delete?</span>
+                        <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition">Yes</button>
+                        <button id="cancel-delete-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition">No</button>
+                    </div>
+
+                    <button id="trigger-delete-btn" class="text-red-500/50 hover:text-red-500 transition p-2" title="Delete Submission">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+
                     <div class="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700">
                         <button id="toggle-pen-btn" class="px-4 py-2 rounded-md text-[11px] font-bold uppercase transition flex items-center gap-2 bg-slate-700 text-slate-400 hover:text-white">
                             <span class="w-2 h-2 rounded-full bg-current"></span> Blue Pen
                         </button>
                         <button id="clear-pen-btn" class="px-3 py-2 rounded-md text-[11px] font-bold uppercase text-red-400 hover:bg-red-900/30 transition">Clear</button>
                     </div>
+
                     <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex items-center gap-2">
                         <input type="number" id="grade-input" min="0" max="100" class="w-14 bg-slate-950 border border-slate-600 text-white rounded px-2 py-1 text-sm font-bold outline-none" placeholder="--">
                         <span class="text-slate-500 text-xs font-bold">/100</span>
                         <button id="save-grade-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-[11px] font-bold uppercase transition">Save All</button>
                     </div>
+                    
                     <button id="close-modal" class="text-slate-500 hover:text-white p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
             </div>
+            
             <div id="modal-scroll-area" class="flex-1 overflow-y-auto bg-slate-800/50 p-8">
                 <div id="canvas-container" class="relative shadow-2xl rounded-sm">
                     <div id="modal-content" class="paper-texture text-slate-800 p-16 whitespace-pre-wrap"></div>
                     <canvas id="annotation-canvas"></canvas>
                 </div>
             </div>
+            
             <div class="px-6 py-2 bg-slate-900 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between uppercase font-bold tracking-widest">
                 <span id="modal-word-count">0 words</span>
                 <span id="save-indicator" class="text-blue-500 opacity-0 transition-opacity">Saving...</span>
@@ -164,7 +181,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
@@ -195,13 +212,16 @@
         const togglePenBtn = document.getElementById('toggle-pen-btn');
         const monitorBtn = document.getElementById('view-monitor-btn');
         const gradebookBtn = document.getElementById('view-gradebook-btn');
+
         const loginOverlay = document.getElementById('login-overlay');
         const loginForm = document.getElementById('login-form');
         const accessInput = document.getElementById('access-key');
         const dashContent = document.getElementById('dashboard-content');
         
-        let isDrawing = false;
-        let penEnabled = false;
+        const triggerDeleteBtn = document.getElementById('trigger-delete-btn');
+        const deleteConfirmUi = document.getElementById('delete-confirm-ui');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
         if (sessionStorage.getItem('teacher_authenticated') === 'true') { unlockDashboard(); }
 
@@ -244,9 +264,11 @@
             document.getElementById('canvas-container').classList.toggle('pen-active', penEnabled);
             togglePenBtn.classList.toggle('bg-blue-600', penEnabled);
             togglePenBtn.classList.toggle('bg-slate-700', !penEnabled);
+            togglePenBtn.classList.toggle('text-white', penEnabled);
+            togglePenBtn.classList.toggle('text-slate-400', !penEnabled);
         });
 
-        document.getElementById('clear-pen-btn').onclick = () => { if(confirm("Clear notes?")) ctx.clearRect(0,0,canvas.width,canvas.height); };
+        document.getElementById('clear-pen-btn').onclick = () => { ctx.clearRect(0,0,canvas.width,canvas.height); };
 
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect();
@@ -259,7 +281,38 @@
         canvas.onmousemove = (e) => { if(!isDrawing) return; const c = getCoords(e); ctx.lineWidth = 2.5; ctx.strokeStyle = '#2563eb'; ctx.lineTo(c.x, c.y); ctx.stroke(); };
         window.onmouseup = () => isDrawing = false;
 
-        document.getElementById('close-modal').onclick = () => { modal.classList.add('hidden'); currentlyViewingId = null; ctx.clearRect(0,0,canvas.width,canvas.height); };
+        document.getElementById('close-modal').onclick = () => {
+            modal.classList.add('hidden');
+            currentlyViewingId = null;
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            penEnabled = false;
+            document.getElementById('canvas-container').classList.remove('pen-active');
+            deleteConfirmUi.classList.add('hidden');
+            triggerDeleteBtn.classList.remove('hidden');
+        };
+
+        // DELETE LOGIC
+        triggerDeleteBtn.onclick = () => {
+            triggerDeleteBtn.classList.add('hidden');
+            deleteConfirmUi.classList.remove('hidden');
+        };
+
+        cancelDeleteBtn.onclick = () => {
+            deleteConfirmUi.classList.add('hidden');
+            triggerDeleteBtn.classList.remove('hidden');
+        };
+
+        confirmDeleteBtn.onclick = async () => {
+            if(!currentlyViewingId) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId));
+                modal.classList.add('hidden');
+                currentlyViewingId = null;
+                renderUI();
+            } catch (e) {
+                alert("Permission Denied: Make sure your Teacher ID is in the Firebase Rules for 'delete'.");
+            }
+        };
 
         async function initDashboard() {
             try { await signInAnonymously(auth); listenToSubmissions(); } catch (e) { console.error(e); }
@@ -307,33 +360,33 @@
                 const card = document.createElement('div');
                 card.className = `bg-slate-900 border ${isActive ? 'border-emerald-500/50' : 'border-slate-800'} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer flex flex-col h-full`;
                 
-                const header = document.createElement('div');
-                header.className = "flex justify-between items-start mb-2";
-                header.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div><span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span></div>`;
+                const cardHeader = document.createElement('div');
+                cardHeader.className = "flex justify-between items-start mb-2";
+                cardHeader.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div><span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span></div>`;
                 
                 if(sub.grade) {
                     const g = document.createElement('span');
                     g.className = "text-[10px] font-bold text-blue-400 bg-blue-900/30 px-2 rounded border border-blue-800";
                     g.textContent = `${sub.grade}/100`;
-                    header.appendChild(g);
+                    cardHeader.appendChild(g);
                 }
 
-                const name = document.createElement('h3');
-                name.className = "font-bold text-white truncate";
-                name.textContent = sub.studentName || 'Unknown';
+                const studentNameEl = document.createElement('h3');
+                studentNameEl.className = "font-bold text-white text-lg truncate leading-tight";
+                studentNameEl.textContent = sub.studentName || 'Unknown';
 
-                const assign = document.createElement('p');
-                assign.className = "text-[10px] text-blue-500 font-medium truncate mb-4";
-                assign.textContent = sub.assignment || 'Untitled Assignment';
+                const assignmentTitleEl = document.createElement('p');
+                assignmentTitleEl.className = "text-xs text-blue-500 font-bold mt-1 mb-4 block";
+                assignmentTitleEl.textContent = sub.assignment || 'Untitled Assignment';
 
-                const footer = document.createElement('div');
-                footer.className = "flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-800 pt-3 mt-auto";
-                footer.innerHTML = `<span>${sub.wordCount || 0} words</span><button class="bg-blue-600 text-white px-3 py-1 rounded font-bold uppercase tracking-tighter">Review</button>`;
+                const cardFooter = document.createElement('div');
+                cardFooter.className = "flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-800 pt-3 mt-auto";
+                cardFooter.innerHTML = `<span>${sub.wordCount || 0} words</span><button class="bg-blue-600 text-white px-3 py-1 rounded font-bold uppercase tracking-tighter">Review</button>`;
 
-                card.appendChild(header);
-                card.appendChild(name);
-                card.appendChild(assign);
-                card.appendChild(footer);
+                card.appendChild(cardHeader);
+                card.appendChild(studentNameEl);
+                card.appendChild(assignmentTitleEl);
+                card.appendChild(cardFooter);
                 
                 card.onclick = () => openReview(sub);
                 grid.appendChild(card);
