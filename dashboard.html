@@ -51,11 +51,35 @@
         .gradebook-table th { @apply text-left p-4 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800; }
         .gradebook-table td { @apply p-4 text-sm border-b border-slate-800/50; }
         .gradebook-table tr:hover { @apply bg-slate-900/50; }
+
+        .blur-bg { backdrop-filter: blur(12px); }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen p-4 md:p-8">
 
-    <div id="dashboard-content">
+    <!-- PASSWORD PROTECTION OVERLAY -->
+    <div id="login-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4 blur-bg">
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+            <div class="bg-blue-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-2">Teacher Access Required</h2>
+            <p class="text-slate-500 text-sm mb-6">Enter your security key to view the Control Tower.</p>
+            
+            <form id="login-form" class="space-y-4">
+                <input type="password" id="access-key" autocomplete="current-password" placeholder="Enter Security Key" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest" required autofocus>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition shadow-lg">
+                    Unlock Dashboard
+                </button>
+                <p id="login-error" class="text-red-500 text-xs font-semibold hidden">Invalid Security Key</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD (HIDDEN UNTIL LOGIN) -->
+    <div id="dashboard-content" class="invisible">
         <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
             <div>
                 <h1 class="text-3xl font-bold text-white tracking-tight">Exam Control Tower</h1>
@@ -100,8 +124,21 @@
                 </table>
             </div>
 
-            <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">No assessments found in this project.</div>
+            <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">No assessments found.</div>
         </main>
+
+        <!-- TEACHER UID FOOTER (FOR SECURITY RULES) -->
+        <footer class="max-w-7xl mx-auto mt-20 pt-8 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-600 uppercase tracking-widest font-bold">
+            <div class="flex items-center gap-2">
+                <span>Security Status: Active</span>
+                <span class="w-1 h-1 rounded-full bg-slate-600"></span>
+                <span>Encrypted Connection</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span>Teacher ID:</span>
+                <span id="teacher-uid-display" class="text-blue-500 select-all cursor-pointer hover:text-blue-400">Loading...</span>
+            </div>
+        </footer>
     </div>
 
     <!-- Reading Modal -->
@@ -147,9 +184,11 @@
         </div>
     </div>
 
+    <!-- CryptoJS for MD5 Hashing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -161,6 +200,8 @@
             appId: "1:21075780226:web:7b6d9b938e7bedb9e80a9b"
         };
         
+        const TEACHER_PASSWORD_HASH = "4c23fb39df853626ea346e6e7e5512ad";
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -168,22 +209,64 @@
 
         let allSubmissions = [];
         let currentlyViewingId = null;
-        let currentView = 'monitor'; // 'monitor' or 'gradebook'
+        let currentView = 'monitor';
 
         const grid = document.getElementById('student-grid');
         const gradebookView = document.getElementById('gradebook-view');
         const modal = document.getElementById('view-modal');
         const modalContent = document.getElementById('modal-content');
         const canvas = document.getElementById('annotation-canvas');
-        const ctx = canvas.getContext('2d', { alpha: true });
+        const ctx = canvas.getContext('2d');
         const togglePenBtn = document.getElementById('toggle-pen-btn');
         const monitorBtn = document.getElementById('view-monitor-btn');
         const gradebookBtn = document.getElementById('view-gradebook-btn');
+
+        const loginOverlay = document.getElementById('login-overlay');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const accessInput = document.getElementById('access-key');
+        const dashContent = document.getElementById('dashboard-content');
+        const uidDisplay = document.getElementById('teacher-uid-display');
         
         let isDrawing = false;
         let penEnabled = false;
 
-        // View Toggles
+        // AUTHENTICATION
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                uidDisplay.innerText = user.uid;
+            }
+        });
+
+        if (sessionStorage.getItem('teacher_authenticated') === 'true') {
+            unlockDashboard();
+        }
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const inputHash = CryptoJS.MD5(accessInput.value).toString();
+            
+            if (inputHash === TEACHER_PASSWORD_HASH) {
+                sessionStorage.setItem('teacher_authenticated', 'true');
+                unlockDashboard();
+            } else {
+                loginError.classList.remove('hidden');
+                accessInput.value = '';
+                accessInput.focus();
+            }
+        });
+
+        accessInput.addEventListener('input', () => {
+            loginError.classList.add('hidden');
+        });
+
+        function unlockDashboard() {
+            loginOverlay.classList.add('hidden');
+            dashContent.classList.remove('invisible');
+            initDashboard();
+        }
+
+        // VIEW NAVIGATION
         monitorBtn.onclick = () => {
             currentView = 'monitor';
             monitorBtn.className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
@@ -198,6 +281,7 @@
             renderUI();
         };
 
+        // CANVAS LOGIC
         function resizeCanvas() {
             canvas.width = 800;
             canvas.height = modalContent.scrollHeight;
@@ -214,11 +298,9 @@
             togglePenBtn.classList.toggle('text-slate-400', !penEnabled);
         });
 
-        document.getElementById('clear-pen-btn').addEventListener('click', () => {
-            if(confirm("Wipe all blue pen notes for this student?")) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        });
+        document.getElementById('clear-pen-btn').onclick = () => {
+            if(confirm("Clear notes?")) ctx.clearRect(0,0,canvas.width,canvas.height);
+        };
 
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect();
@@ -229,42 +311,19 @@
             return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
-        function startDrawing(e) {
-            if (!penEnabled) return;
-            isDrawing = true;
-            const coords = getCoords(e);
-            ctx.beginPath();
-            ctx.moveTo(coords.x, coords.y);
-        }
+        canvas.onmousedown = (e) => { if(!penEnabled) return; isDrawing = true; const c = getCoords(e); ctx.beginPath(); ctx.moveTo(c.x, c.y); };
+        canvas.onmousemove = (e) => { if(!isDrawing) return; const c = getCoords(e); ctx.lineWidth = 2.5; ctx.strokeStyle = '#2563eb'; ctx.lineTo(c.x, c.y); ctx.stroke(); };
+        window.onmouseup = () => isDrawing = false;
 
-        function draw(e) {
-            if (!isDrawing || !penEnabled) return;
-            const coords = getCoords(e);
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.strokeStyle = '#2563eb';
-            ctx.lineTo(coords.x, coords.y);
-            ctx.stroke();
-        }
-
-        function stopDrawing() { isDrawing = false; }
-
-        canvas.addEventListener('mousedown', startDrawing);
-        canvas.addEventListener('mousemove', draw);
-        window.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, {passive: false});
-        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, {passive: false});
-        canvas.addEventListener('touchend', stopDrawing);
-
-        document.getElementById('close-modal').addEventListener('click', () => {
+        document.getElementById('close-modal').onclick = () => {
             modal.classList.add('hidden');
             currentlyViewingId = null;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0,0,canvas.width,canvas.height);
             penEnabled = false;
             document.getElementById('canvas-container').classList.remove('pen-active');
-        });
+        };
 
+        // FIREBASE SYNC
         async function initDashboard() {
             try {
                 await signInAnonymously(auth);
@@ -273,9 +332,9 @@
         }
 
         function listenToSubmissions() {
-            const submissionsRef = collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions');
-            onSnapshot(submissionsRef, (snapshot) => {
-                allSubmissions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            const ref = collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions');
+            onSnapshot(ref, (snap) => {
+                allSubmissions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 document.getElementById('loading-indicator').classList.add('hidden');
                 renderUI();
             });
@@ -298,11 +357,10 @@
             grid.innerHTML = '';
 
             const filtered = allSubmissions
-                .filter(s => (s.studentName||'').toLowerCase().includes(search) || (s.assignment||'').toLowerCase().includes(search))
+                .filter(s => (s.studentName||'').toLowerCase().includes(search))
                 .sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
 
             if(!filtered.length) { document.getElementById('empty-state').classList.remove('hidden'); return; }
-            
             document.getElementById('empty-state').classList.add('hidden');
             grid.classList.remove('hidden');
 
@@ -314,21 +372,24 @@
 
                 const card = document.createElement('div');
                 card.className = `bg-slate-900 border ${isActive ? 'border-emerald-500/50' : 'border-slate-800'} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer`;
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div>
-                            <span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span>
-                        </div>
-                        ${sub.grade ? `<span class="text-[10px] font-bold text-blue-400 bg-blue-900/30 px-2 rounded border border-blue-800">${sub.grade}/100</span>` : ''}
-                    </div>
-                    <h3 class="font-bold text-white truncate">${sub.studentName || 'Unknown'}</h3>
-                    <p class="text-[10px] text-blue-500 font-medium truncate mb-4">${sub.assignment || 'Untitled'}</p>
-                    <div class="flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-800 pt-3">
-                        <span>${sub.wordCount || 0} words</span>
-                        <button class="bg-blue-600 text-white px-3 py-1 rounded font-bold uppercase tracking-tighter">Review</button>
-                    </div>
-                `;
+                
+                const head = document.createElement('div');
+                head.className = "flex justify-between items-start mb-2";
+                head.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div><span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span></div>`;
+                
+                if(sub.grade) {
+                    const g = document.createElement('span');
+                    g.className = "text-[10px] font-bold text-blue-400 bg-blue-900/30 px-2 rounded border border-blue-800";
+                    g.textContent = `${sub.grade}/100`;
+                    head.appendChild(g);
+                }
+
+                const n = document.createElement('h3');
+                n.className = "font-bold text-white truncate";
+                n.textContent = sub.studentName || 'Unknown';
+
+                card.appendChild(head);
+                card.appendChild(n);
                 card.onclick = () => openReview(sub);
                 grid.appendChild(card);
             });
@@ -339,48 +400,19 @@
             const body = document.getElementById('gradebook-body');
             body.innerHTML = '';
             gradebookView.classList.remove('hidden');
-            document.getElementById('empty-state').classList.add('hidden');
-
-            // Group by student
+            
             const students = {};
             allSubmissions.forEach(sub => {
-                if (!students[sub.studentName]) {
-                    students[sub.studentName] = { assignments: [], totalGrade: 0, gradedCount: 0 };
-                }
+                if (!students[sub.studentName]) students[sub.studentName] = { assignments: [], total: 0, count: 0 };
                 students[sub.studentName].assignments.push(sub);
-                if (sub.grade) {
-                    students[sub.studentName].totalGrade += parseFloat(sub.grade);
-                    students[sub.studentName].gradedCount++;
-                }
+                if (sub.grade) { students[sub.studentName].total += parseFloat(sub.grade); students[sub.studentName].count++; }
             });
 
-            // Sort alphabetically
-            const sortedNames = Object.keys(students).sort();
-
-            sortedNames.forEach(name => {
-                const data = students[name];
-                const avg = data.gradedCount > 0 ? (data.totalGrade / data.gradedCount).toFixed(1) : '---';
-                
+            Object.keys(students).sort().forEach(name => {
+                const d = students[name];
+                const avg = d.count > 0 ? (d.total / d.count).toFixed(1) : '---';
                 const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="font-bold text-white">${name}</td>
-                    <td><span class="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">${data.assignments.length} Tasks</span></td>
-                    <td>
-                        <div class="flex flex-wrap gap-2">
-                            ${data.assignments.map(a => `
-                                <div class="flex flex-col">
-                                    <span class="text-[9px] text-slate-500 truncate w-24 uppercase font-bold">${a.assignment}</span>
-                                    <span class="text-xs ${a.grade ? 'text-blue-400 font-bold' : 'text-slate-600 italic'}">${a.grade ? a.grade + '%' : 'Unmarked'}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </td>
-                    <td class="text-right">
-                        <span class="text-xl font-mono font-bold ${avg !== '---' ? (avg >= 50 ? 'text-emerald-400' : 'text-amber-500') : 'text-slate-700'}">
-                            ${avg}${avg !== '---' ? '%' : ''}
-                        </span>
-                    </td>
-                `;
+                row.innerHTML = `<td class="font-bold text-white">${name}</td><td><span class="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">${d.assignments.length} Tasks</span></td><td><div class="flex flex-wrap gap-2">${d.assignments.map(a => `<span class="text-xs ${a.grade ? 'text-blue-400' : 'text-slate-600'}">${a.grade || '??'}%</span>`).join('')}</div></td><td class="text-right font-mono font-bold ${avg !== '---' ? 'text-emerald-400' : 'text-slate-700'}">${avg}%</td>`;
                 body.appendChild(row);
             });
         }
@@ -389,75 +421,47 @@
             currentlyViewingId = sub.id;
             document.getElementById('modal-student-name').innerText = sub.studentName || 'Student';
             document.getElementById('modal-assignment').innerText = sub.assignment || 'Assignment';
-            document.getElementById('modal-word-count').innerText = `${sub.wordCount || 0} words`;
             document.getElementById('grade-input').value = sub.grade || '';
             modalContent.textContent = sub.content || "";
-            
             modal.classList.remove('hidden');
-            
             setTimeout(() => {
                 resizeCanvas();
-                if (sub.annotations) {
-                    const img = new Image();
-                    img.onload = () => ctx.drawImage(img, 0, 0);
-                    img.src = sub.annotations;
-                }
+                if (sub.annotations) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = sub.annotations; }
             }, 100);
         }
 
         document.getElementById('save-grade-btn').onclick = async () => {
             if(!currentlyViewingId) return;
-            const btn = document.getElementById('save-grade-btn');
             const indicator = document.getElementById('save-indicator');
-            
-            btn.disabled = true;
             indicator.style.opacity = '1';
-
             try {
-                const dataUrl = canvas.toDataURL('image/png');
-                const docRef = doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId);
-                await updateDoc(docRef, {
+                await updateDoc(doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId), {
                     grade: document.getElementById('grade-input').value,
-                    annotations: dataUrl
+                    annotations: canvas.toDataURL()
                 });
-                btn.innerText = "SAVED";
-                setTimeout(() => { 
-                    btn.innerText = "SAVE ALL"; 
-                    btn.disabled = false; 
-                    indicator.style.opacity = '0'; 
-                    // Refresh view to show updated grade
-                    renderUI();
-                }, 1000);
-            } catch (e) { alert("Save failed: " + e.message); btn.disabled = false; }
+                indicator.style.opacity = '0';
+                renderUI();
+            } catch (e) { alert("Save failed: Check your Teacher ID is in the Firebase Rules."); }
         };
-
-        document.getElementById('search-input').oninput = renderUI;
-        setInterval(renderUI, 30000);
 
         document.getElementById('download-zip-btn').onclick = async () => {
             const zip = new JSZip();
-            allSubmissions.forEach(s => {
-                const name = (s.studentName||'Unnamed').replace(/\s/g,'_');
-                zip.file(`${name}.txt`, `Student: ${s.studentName}\nGrade: ${s.grade||'N/A'}/100\n\n${s.content}`);
-            });
+            allSubmissions.forEach(s => zip.file(`${s.studentName}.txt`, `Student: ${s.studentName}\nGrade: ${s.grade||'N/A'}/100\n\n${s.content}`));
             const content = await zip.generateAsync({type:"blob"});
             const link = document.createElement("a");
             link.href = URL.createObjectURL(content);
-            link.download = "History_Essays.zip";
+            link.download = "Class_Essays.zip";
             link.click();
         };
 
         document.getElementById('export-btn').onclick = () => {
-            const csv = ["Name,Assignment,Grade,Words,Last Updated"];
-            allSubmissions.forEach(s => csv.push(`"${s.studentName}","${s.assignment}","${s.grade||''}","${s.wordCount}","${s.lastUpdated}"`));
+            const csv = ["Name,Assignment,Grade"].concat(allSubmissions.map(s => `"${s.studentName}","${s.assignment}","${s.grade||''}"`));
             const blob = new Blob([csv.join("\n")], {type: 'text/csv'});
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.download = "grades.csv";
             link.click();
         };
-
-        initDashboard();
     </script>
 </body>
 </html>
