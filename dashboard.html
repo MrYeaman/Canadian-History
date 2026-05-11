@@ -14,8 +14,8 @@
         .status-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         
-        #modal-content::-webkit-scrollbar { width: 8px; }
-        #modal-content::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        #modal-scroll-area::-webkit-scrollbar { width: 8px; }
+        #modal-scroll-area::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
         
         .paper-texture {
             background-color: #fffdfa;
@@ -24,6 +24,19 @@
             line-height: 2.5rem;
             font-family: 'Crimson Pro', serif;
             font-size: 1.25rem;
+            position: relative;
+        }
+
+        #annotation-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* Controlled by toggle */
+            cursor: crosshair;
+        }
+
+        .pen-active #annotation-canvas {
+            pointer-events: auto;
         }
     </style>
 </head>
@@ -73,32 +86,47 @@
 
     <!-- Reading Modal -->
     <div id="view-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
-        <div class="bg-slate-900 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
-            <div class="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-900">
+        <div class="bg-slate-900 rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex flex-wrap justify-between items-center bg-slate-900 gap-4">
                 <div>
-                    <h2 id="modal-student-name" class="text-2xl font-bold text-white mb-1">Student Name</h2>
-                    <p id="modal-assignment" class="text-blue-400 font-medium text-sm">Assignment Name</p>
+                    <h2 id="modal-student-name" class="text-xl font-bold text-white leading-tight">Student Name</h2>
+                    <p id="modal-assignment" class="text-blue-400 font-medium text-xs">Assignment Name</p>
                 </div>
-                <div class="flex items-start gap-4">
+                
+                <div class="flex items-center gap-3">
+                    <!-- Annotation Controls -->
+                    <div class="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700">
+                        <button id="toggle-pen-btn" class="px-3 py-1.5 rounded-md text-[11px] font-bold uppercase transition flex items-center gap-2 bg-slate-700 text-slate-400 hover:text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            Blue Pen
+                        </button>
+                        <button id="clear-pen-btn" class="px-3 py-1.5 rounded-md text-[11px] font-bold uppercase text-red-400 hover:bg-red-900/30 transition">Clear</button>
+                    </div>
+
                     <!-- Grading Section -->
-                    <div class="bg-slate-800 p-2 rounded-lg border border-slate-700 flex items-center gap-2">
-                        <label class="text-[10px] uppercase font-black text-slate-500 leading-none">Grade</label>
-                        <input type="number" id="grade-input" min="0" max="100" class="w-16 bg-slate-950 border border-slate-600 text-white rounded px-2 py-1 text-sm font-bold focus:outline-none focus:border-blue-500" placeholder="--">
-                        <span class="text-slate-500 font-bold">/100</span>
-                        <button id="save-grade-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[10px] font-bold uppercase transition">Save</button>
+                    <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex items-center gap-2">
+                        <input type="number" id="grade-input" min="0" max="100" class="w-14 bg-slate-950 border border-slate-600 text-white rounded px-2 py-1 text-sm font-bold focus:outline-none focus:border-blue-500" placeholder="--">
+                        <span class="text-slate-500 text-xs font-bold">/100</span>
+                        <button id="save-grade-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[11px] font-bold uppercase transition">Save All</button>
                     </div>
                     
-                    <div class="text-right">
-                        <button id="close-modal" class="text-slate-500 hover:text-white transition p-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                        <div id="modal-word-count" class="text-slate-400 text-[10px] font-mono mt-1">0 words</div>
-                    </div>
+                    <button id="close-modal" class="text-slate-500 hover:text-white transition p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                 </div>
             </div>
             
-            <div class="p-6 md:p-10 flex-1 overflow-y-auto bg-slate-200">
-                <div id="modal-content" class="paper-texture text-slate-800 w-full min-h-full p-8 rounded-lg shadow-inner whitespace-pre-wrap"></div>
+            <div id="modal-scroll-area" class="flex-1 overflow-y-auto bg-slate-200">
+                <div class="p-6 md:p-12 min-h-full flex justify-center">
+                    <div id="canvas-container" class="relative w-full max-w-3xl shadow-2xl rounded-sm overflow-hidden">
+                        <div id="modal-content" class="paper-texture text-slate-800 w-full p-10 md:p-16 whitespace-pre-wrap min-h-[1000px]"></div>
+                        <canvas id="annotation-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-2 bg-slate-900 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between">
+                <span id="modal-word-count">0 words</span>
+                <span>Blue Pen is pressure-sensitive and saved automatically with the Grade.</span>
             </div>
         </div>
     </div>
@@ -140,16 +168,78 @@
         const gradeInput = document.getElementById('grade-input');
         const saveGradeBtn = document.getElementById('save-grade-btn');
 
+        // Annotation Canvas Logic
+        const canvas = document.getElementById('annotation-canvas');
+        const ctx = canvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvas-container');
+        const togglePenBtn = document.getElementById('toggle-pen-btn');
+        const clearPenBtn = document.getElementById('clear-pen-btn');
+
+        let isDrawing = false;
+        let penEnabled = false;
+
+        function resizeCanvas() {
+            canvas.width = modalContent.offsetWidth;
+            canvas.height = modalContent.offsetHeight;
+            // Redraw if needed (handled by loadAnnotations)
+        }
+
+        togglePenBtn.addEventListener('click', () => {
+            penEnabled = !penEnabled;
+            if (penEnabled) {
+                canvasContainer.classList.add('pen-active');
+                togglePenBtn.classList.replace('bg-slate-700', 'bg-blue-600');
+                togglePenBtn.classList.replace('text-slate-400', 'text-white');
+            } else {
+                canvasContainer.classList.remove('pen-active');
+                togglePenBtn.classList.replace('bg-blue-600', 'bg-slate-700');
+                togglePenBtn.classList.replace('text-white', 'text-slate-400');
+            }
+        });
+
+        clearPenBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        function startDrawing(e) {
+            if (!penEnabled) return;
+            isDrawing = true;
+            draw(e);
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!isDrawing || !penEnabled) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#2563eb'; // Blue Pen
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+        canvas.addEventListener('touchend', stopDrawing);
+
         document.getElementById('close-modal').addEventListener('click', () => {
             modal.classList.add('hidden');
             currentlyViewingId = null;
-        });
-
-        modal.addEventListener('click', (e) => { 
-            if(e.target === modal) {
-                modal.classList.add('hidden');
-                currentlyViewingId = null;
-            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         });
 
         async function initDashboard() {
@@ -173,7 +263,7 @@
                 renderGrid();
             }, (error) => {
                 console.error("Database Error:", error);
-                loadingIndicator.innerHTML = `<span class="text-red-500">Permission Denied. Check Firebase Rules.</span>`;
+                loadingIndicator.innerHTML = `<span class="text-red-500">Permission Denied.</span>`;
             });
         }
 
@@ -184,8 +274,6 @@
             if (seconds < 60) return 'Just now';
             const minutes = Math.floor(seconds / 60);
             if (minutes < 60) return `${minutes}m ago`;
-            const hours = Math.floor(minutes / 60);
-            if (hours < 24) return `${hours}h ago`;
             return date.toLocaleDateString();
         }
 
@@ -222,40 +310,32 @@
             filtered.forEach(sub => {
                 let isSubmitted = sub.submitted === true;
                 let lastUpdatedTime = new Date(sub.lastUpdated || 0);
-                let minutesSinceUpdate = (now - lastUpdatedTime) / 60000;
-                let isActive = !isSubmitted && minutesSinceUpdate < 2;
+                let isActive = !isSubmitted && (now - lastUpdatedTime) / 60000 < 2;
                 if (isActive) activeCount++;
 
-                let statusColor = isSubmitted ? 'bg-slate-600 shadow-[0_0_8px_rgba(71,85,105,0.5)]' : (isActive ? 'bg-emerald-500 status-pulse shadow-[0_0_12px_rgba(16,185,129,0.4)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]');
-                let statusText = isSubmitted ? 'LOCKED' : (isActive ? 'TYPING...' : 'IDLE');
-                let borderColor = isSubmitted ? 'border-slate-800' : (isActive ? 'border-emerald-500/40' : 'border-amber-500/30');
-                
-                // Grade display logic
-                const hasGrade = sub.grade !== undefined && sub.grade !== "";
+                let statusColor = isSubmitted ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500');
+                let hasGrade = sub.grade !== undefined && sub.grade !== "";
                 const gradeDisplay = hasGrade ? `<span class="bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-700/50">${sub.grade}/100</span>` : '';
 
                 const card = document.createElement('div');
-                card.className = `bg-slate-900 border ${borderColor} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer relative group overflow-hidden flex flex-col`;
+                card.className = `bg-slate-900 border border-slate-800 p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer flex flex-col`;
                 
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-3">
                         <div class="flex flex-col gap-1">
                             <div class="flex items-center gap-2">
                                 <div class="w-2 h-2 rounded-full ${statusColor}"></div>
-                                <span class="text-[10px] font-black tracking-widest uppercase text-slate-400">${statusText}</span>
+                                <span class="text-[10px] font-black uppercase text-slate-400">${isSubmitted ? 'LOCKED' : (isActive ? 'TYPING' : 'IDLE')}</span>
                             </div>
                             ${gradeDisplay}
                         </div>
-                        <span class="text-xs font-mono text-slate-500">${formatTimeAgo(sub.lastUpdated)}</span>
+                        <span class="text-[10px] font-mono text-slate-500">${formatTimeAgo(sub.lastUpdated)}</span>
                     </div>
-                    <h3 class="font-bold text-lg text-white mb-1 truncate">${sub.studentName || 'Unknown'}</h3>
-                    <p class="text-xs text-blue-400 font-medium truncate mb-4">${sub.assignment || 'No Assignment'}</p>
+                    <h3 class="font-bold text-base text-white truncate">${sub.studentName || 'Unknown'}</h3>
+                    <p class="text-[10px] text-blue-400 font-medium truncate mb-4">${sub.assignment || 'No Assignment'}</p>
                     <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-auto">
-                        <div>
-                            <span class="block text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">Words</span>
-                            <span class="font-mono font-bold text-white text-lg leading-none">${sub.wordCount || 0}</span>
-                        </div>
-                        <button class="text-xs bg-slate-800 group-hover:bg-blue-600 text-white px-3 py-1.5 rounded transition opacity-0 group-hover:opacity-100">Grade & Read</button>
+                        <div class="text-[10px] uppercase tracking-widest text-slate-500">Words: <span class="text-white font-bold">${sub.wordCount || 0}</span></div>
+                        <button class="text-[10px] bg-slate-800 hover:bg-blue-600 text-white px-3 py-1.5 rounded transition">Review</button>
                     </div>
                 `;
 
@@ -265,13 +345,19 @@
                     modalAssignment.innerText = sub.assignment || 'No Assignment specified';
                     modalWordCount.innerText = `${sub.wordCount || 0} words`;
                     gradeInput.value = sub.grade || '';
+                    modalContent.textContent = sub.content || "(Empty)";
                     
-                    if (!sub.content || sub.content.trim() === '') {
-                        modalContent.innerHTML = `<span class="text-slate-400 italic">No content drafted yet.</span>`;
-                    } else {
-                        modalContent.textContent = sub.content;
-                    }
                     modal.classList.remove('hidden');
+                    
+                    // Delay canvas resize until content is rendered
+                    setTimeout(() => {
+                        resizeCanvas();
+                        if (sub.annotations) {
+                            const img = new Image();
+                            img.onload = () => ctx.drawImage(img, 0, 0);
+                            img.src = sub.annotations;
+                        }
+                    }, 50);
                 });
 
                 grid.appendChild(card);
@@ -279,11 +365,12 @@
             activeCountEl.innerText = activeCount;
         }
 
-        // SAVE GRADE LOGIC
+        // SAVE GRADE & ANNOTATIONS
         saveGradeBtn.addEventListener('click', async () => {
             if (!currentlyViewingId) return;
             
             const grade = gradeInput.value;
+            const annotationsData = canvas.toDataURL(); // Save as base64
             const docRef = doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId);
             
             saveGradeBtn.textContent = "...";
@@ -291,16 +378,17 @@
             
             try {
                 await updateDoc(docRef, {
-                    grade: grade
+                    grade: grade,
+                    annotations: annotationsData
                 });
-                saveGradeBtn.textContent = "✓";
+                saveGradeBtn.textContent = "SAVED";
                 setTimeout(() => {
-                    saveGradeBtn.textContent = "Save";
+                    saveGradeBtn.textContent = "Save All";
                     saveGradeBtn.disabled = false;
                 }, 1500);
             } catch (e) {
-                console.error("Error saving grade:", e);
-                saveGradeBtn.textContent = "Error";
+                console.error("Error saving:", e);
+                saveGradeBtn.textContent = "ERROR";
                 saveGradeBtn.disabled = false;
             }
         });
@@ -308,71 +396,46 @@
         searchInput.addEventListener('input', renderGrid);
         setInterval(renderGrid, 60000);
 
-        // ZIP DOWNLOAD LOGIC
+        // ZIP DOWNLOAD LOGIC (Included in ZIP as image metadata if desired, but here just keeps text)
         document.getElementById('download-zip-btn').addEventListener('click', async () => {
             if (allSubmissions.length === 0) return alert("No assessments to download.");
-            
             const zip = new JSZip();
             const dateStr = new Date().toISOString().split('T')[0];
-            const folderName = `History_Portals_Graded_${dateStr}`;
-            const folder = zip.folder(folderName);
+            const folder = zip.folder(`History_Submissions_${dateStr}`);
 
             allSubmissions.forEach(sub => {
                 const safeName = (sub.studentName || 'Unknown').replace(/[^a-z0-9]/gi, '_');
-                const safeAssign = (sub.assignment || 'No_Title').replace(/[^a-z0-9]/gi, '_');
-                const filename = `${safeName} - ${safeAssign}.txt`;
-                
-                const fileContent = 
-`=========================================================
-STUDENT: ${sub.studentName || 'Unknown'}
-ASSIGNMENT: ${sub.assignment || 'N/A'}
-GRADE: ${sub.grade !== undefined ? sub.grade + '/100' : 'UNGRADED'}
-WORD COUNT: ${sub.wordCount || 0}
-STATUS: ${sub.submitted ? 'FINAL SUBMISSION (LOCKED)' : 'IN-PROGRESS DRAFT'}
-LAST UPDATED: ${new Date(sub.lastUpdated).toLocaleString()}
-=========================================================
-
-${sub.content || '(Empty Response)'}
-
-=========================================================
-End of Response`;
-
-                folder.file(filename, fileContent);
+                const fileContent = `STUDENT: ${sub.studentName}\nGRADE: ${sub.grade || 'N/A'}/100\n\n${sub.content}`;
+                folder.file(`${safeName}.txt`, fileContent);
             });
 
             const content = await zip.generateAsync({type: "blob"});
             const url = window.URL.createObjectURL(content);
             const link = document.createElement("a");
             link.href = url;
-            link.download = `${folderName}.zip`;
-            document.body.appendChild(link);
+            link.download = `Graded_Essays_${dateStr}.zip`;
             link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
         });
 
         // CSV EXPORT LOGIC
         document.getElementById('export-btn').addEventListener('click', () => {
             if (allSubmissions.length === 0) return alert("No data to export.");
-            const headers = ['Student Name', 'Assignment', 'Grade (out of 100)', 'Status', 'Word Count', 'Last Updated', 'Content'];
+            const headers = ['Student Name', 'Assignment', 'Grade', 'Word Count', 'Last Updated'];
             const rows = allSubmissions.map(sub => [
                 `"${sub.studentName || ''}"`,
                 `"${sub.assignment || ''}"`,
-                `"${sub.grade || ''}"`,
-                `"${sub.submitted ? 'Submitted' : 'In Progress'}"`,
+                sub.grade || '',
                 sub.wordCount || 0,
-                `"${new Date(sub.lastUpdated).toLocaleString()}"`,
-                `"${(sub.content || '').replace(/"/g, '""')}"`
+                `"${new Date(sub.lastUpdated).toLocaleString()}"`
             ].join(','));
             const csvContent = [headers.join(','), ...rows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `grade10_history_graded_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `grade10_summary.csv`;
             link.click();
         });
 
-        // Start the dashboard immediately
         initDashboard();
     </script>
 </body>
