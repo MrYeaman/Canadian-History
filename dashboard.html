@@ -25,35 +25,12 @@
             font-family: 'Crimson Pro', serif;
             font-size: 1.25rem;
         }
-
-        .blur-bg { backdrop-filter: blur(12px); }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen p-4 md:p-8">
 
-    <!-- PASSWORD PROTECTION OVERLAY -->
-    <div id="login-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4 blur-bg">
-        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
-            <div class="bg-blue-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-            </div>
-            <h2 class="text-xl font-bold text-white mb-2">Teacher Access Required</h2>
-            <p class="text-slate-500 text-sm mb-6">Enter your security key to view the Control Tower.</p>
-            
-            <form id="login-form" class="space-y-4">
-                <input type="password" id="access-key" autocomplete="current-password" placeholder="Enter Security Key" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest" required autofocus>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition shadow-lg">
-                    Unlock Dashboard
-                </button>
-                <p id="login-error" class="text-red-500 text-xs font-semibold hidden">Invalid Security Key</p>
-            </form>
-        </div>
-    </div>
-
-    <!-- MAIN DASHBOARD (HIDDEN UNTIL LOGIN) -->
-    <div id="dashboard-content" class="invisible">
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboard-content">
         <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
             <div>
                 <h1 class="text-3xl font-bold text-white tracking-tight">Exam Control Tower</h1>
@@ -126,7 +103,6 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -141,9 +117,6 @@
             messagingSenderId: "21075780226",
             appId: "1:21075780226:web:7b6d9b938e7bedb9e80a9b"
         };
-
-        // Current default scrambled hash for "HistoryTeacher2024"
-        const TEACHER_PASSWORD_HASH = "8d969eef6ecad3c29a3a629280e686cf"; 
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -152,12 +125,6 @@
 
         let allSubmissions = [];
         let currentlyViewingId = null;
-
-        const loginOverlay = document.getElementById('login-overlay');
-        const loginForm = document.getElementById('login-form');
-        const loginError = document.getElementById('login-error');
-        const accessInput = document.getElementById('access-key');
-        const dashContent = document.getElementById('dashboard-content');
 
         const grid = document.getElementById('student-grid');
         const activeCountEl = document.getElementById('active-count');
@@ -172,34 +139,6 @@
         
         const gradeInput = document.getElementById('grade-input');
         const saveGradeBtn = document.getElementById('save-grade-btn');
-
-        if (sessionStorage.getItem('teacher_authenticated') === 'true') {
-            unlockDashboard();
-        }
-
-        accessInput.addEventListener('input', () => {
-            loginError.classList.add('hidden');
-        });
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const inputHash = CryptoJS.MD5(accessInput.value).toString();
-            
-            if (inputHash === TEACHER_PASSWORD_HASH) {
-                sessionStorage.setItem('teacher_authenticated', 'true');
-                unlockDashboard();
-            } else {
-                loginError.classList.remove('hidden');
-                accessInput.value = '';
-                accessInput.focus();
-            }
-        });
-
-        function unlockDashboard() {
-            loginOverlay.classList.add('hidden');
-            dashContent.classList.remove('invisible');
-            initDashboard();
-        }
 
         document.getElementById('close-modal').addEventListener('click', () => {
             modal.classList.add('hidden');
@@ -369,7 +308,7 @@
         searchInput.addEventListener('input', renderGrid);
         setInterval(renderGrid, 60000);
 
-        // ZIP DOWNLOAD LOGIC (Updated to include Grade)
+        // ZIP DOWNLOAD LOGIC
         document.getElementById('download-zip-btn').addEventListener('click', async () => {
             if (allSubmissions.length === 0) return alert("No assessments to download.");
             
@@ -412,7 +351,7 @@ End of Response`;
             window.URL.revokeObjectURL(url);
         });
 
-        // CSV EXPORT LOGIC (Updated to include Grade)
+        // CSV EXPORT LOGIC
         document.getElementById('export-btn').addEventListener('click', () => {
             if (allSubmissions.length === 0) return alert("No data to export.");
             const headers = ['Student Name', 'Assignment', 'Grade (out of 100)', 'Status', 'Word Count', 'Last Updated', 'Content'];
@@ -433,6 +372,7 @@ End of Response`;
             link.click();
         });
 
+        // Start the dashboard immediately
         initDashboard();
     </script>
 </body>
