@@ -47,7 +47,6 @@
             margin: 0 auto;
         }
 
-        /* Gradebook Table Styles */
         .gradebook-table th { @apply text-left p-4 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800; }
         .gradebook-table td { @apply p-4 text-sm border-b border-slate-800/50; }
         .gradebook-table tr:hover { @apply bg-slate-900/50; }
@@ -78,7 +77,7 @@
         </div>
     </div>
 
-    <!-- MAIN DASHBOARD (HIDDEN UNTIL LOGIN) -->
+    <!-- MAIN DASHBOARD -->
     <div id="dashboard-content" class="invisible">
         <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
             <div>
@@ -105,11 +104,7 @@
 
         <main class="max-w-7xl mx-auto pb-12">
             <div id="loading-indicator" class="text-center py-12 text-slate-500 font-bold animate-pulse">Establishing Secure Uplink...</div>
-            
-            <!-- Monitor View -->
             <div id="student-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden"></div>
-            
-            <!-- Gradebook View -->
             <div id="gradebook-view" class="hidden bg-slate-900/30 rounded-2xl border border-slate-800 overflow-hidden">
                 <table class="w-full gradebook-table">
                     <thead>
@@ -123,22 +118,8 @@
                     <tbody id="gradebook-body"></tbody>
                 </table>
             </div>
-
             <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">No assessments found.</div>
         </main>
-
-        <!-- TEACHER UID FOOTER (FOR SECURITY RULES) -->
-        <footer class="max-w-7xl mx-auto mt-20 pt-8 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-600 uppercase tracking-widest font-bold">
-            <div class="flex items-center gap-2">
-                <span>Security Status: Active</span>
-                <span class="w-1 h-1 rounded-full bg-slate-600"></span>
-                <span>Encrypted Connection</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <span>Teacher ID:</span>
-                <span id="teacher-uid-display" class="text-blue-500 select-all cursor-pointer hover:text-blue-400">Loading...</span>
-            </div>
-        </footer>
     </div>
 
     <!-- Reading Modal -->
@@ -149,7 +130,6 @@
                     <h2 id="modal-student-name" class="text-xl font-bold text-white">Student Name</h2>
                     <p id="modal-assignment" class="text-blue-400 font-medium text-xs">Assignment</p>
                 </div>
-                
                 <div class="flex items-center gap-4">
                     <div class="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700">
                         <button id="toggle-pen-btn" class="px-4 py-2 rounded-md text-[11px] font-bold uppercase transition flex items-center gap-2 bg-slate-700 text-slate-400 hover:text-white">
@@ -157,26 +137,22 @@
                         </button>
                         <button id="clear-pen-btn" class="px-3 py-2 rounded-md text-[11px] font-bold uppercase text-red-400 hover:bg-red-900/30 transition">Clear</button>
                     </div>
-
                     <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex items-center gap-2">
                         <input type="number" id="grade-input" min="0" max="100" class="w-14 bg-slate-950 border border-slate-600 text-white rounded px-2 py-1 text-sm font-bold outline-none" placeholder="--">
                         <span class="text-slate-500 text-xs font-bold">/100</span>
                         <button id="save-grade-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-[11px] font-bold uppercase transition">Save All</button>
                     </div>
-                    
                     <button id="close-modal" class="text-slate-500 hover:text-white p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
             </div>
-            
             <div id="modal-scroll-area" class="flex-1 overflow-y-auto bg-slate-800/50 p-8">
                 <div id="canvas-container" class="relative shadow-2xl rounded-sm">
                     <div id="modal-content" class="paper-texture text-slate-800 p-16 whitespace-pre-wrap"></div>
                     <canvas id="annotation-canvas"></canvas>
                 </div>
             </div>
-            
             <div class="px-6 py-2 bg-slate-900 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between uppercase font-bold tracking-widest">
                 <span id="modal-word-count">0 words</span>
                 <span id="save-indicator" class="text-blue-500 opacity-0 transition-opacity">Saving...</span>
@@ -184,11 +160,10 @@
         </div>
     </div>
 
-    <!-- CryptoJS for MD5 Hashing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -220,45 +195,28 @@
         const togglePenBtn = document.getElementById('toggle-pen-btn');
         const monitorBtn = document.getElementById('view-monitor-btn');
         const gradebookBtn = document.getElementById('view-gradebook-btn');
-
         const loginOverlay = document.getElementById('login-overlay');
         const loginForm = document.getElementById('login-form');
-        const loginError = document.getElementById('login-error');
         const accessInput = document.getElementById('access-key');
         const dashContent = document.getElementById('dashboard-content');
-        const uidDisplay = document.getElementById('teacher-uid-display');
         
         let isDrawing = false;
         let penEnabled = false;
 
-        // AUTHENTICATION
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                uidDisplay.innerText = user.uid;
-            }
-        });
-
-        if (sessionStorage.getItem('teacher_authenticated') === 'true') {
-            unlockDashboard();
-        }
+        if (sessionStorage.getItem('teacher_authenticated') === 'true') { unlockDashboard(); }
 
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const inputHash = CryptoJS.MD5(accessInput.value).toString();
-            
-            if (inputHash === TEACHER_PASSWORD_HASH) {
+            if (CryptoJS.MD5(accessInput.value).toString() === TEACHER_PASSWORD_HASH) {
                 sessionStorage.setItem('teacher_authenticated', 'true');
                 unlockDashboard();
             } else {
-                loginError.classList.remove('hidden');
+                document.getElementById('login-error').classList.remove('hidden');
                 accessInput.value = '';
-                accessInput.focus();
             }
         });
 
-        accessInput.addEventListener('input', () => {
-            loginError.classList.add('hidden');
-        });
+        accessInput.addEventListener('input', () => { document.getElementById('login-error').classList.add('hidden'); });
 
         function unlockDashboard() {
             loginOverlay.classList.add('hidden');
@@ -266,22 +224,14 @@
             initDashboard();
         }
 
-        // VIEW NAVIGATION
-        monitorBtn.onclick = () => {
-            currentView = 'monitor';
-            monitorBtn.className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
-            gradebookBtn.className = "text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition";
-            renderUI();
-        };
+        monitorBtn.onclick = () => { currentView = 'monitor'; updateViewStyles(); renderUI(); };
+        gradebookBtn.onclick = () => { currentView = 'gradebook'; updateViewStyles(); renderUI(); };
 
-        gradebookBtn.onclick = () => {
-            currentView = 'gradebook';
-            gradebookBtn.className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
-            monitorBtn.className = "text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition";
-            renderUI();
-        };
+        function updateViewStyles() {
+            monitorBtn.className = `text-xs font-bold px-3 py-1 rounded ${currentView === 'monitor' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400'}`;
+            gradebookBtn.className = `text-xs font-bold px-3 py-1 rounded ${currentView === 'gradebook' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400'}`;
+        }
 
-        // CANVAS LOGIC
         function resizeCanvas() {
             canvas.width = 800;
             canvas.height = modalContent.scrollHeight;
@@ -294,41 +244,25 @@
             document.getElementById('canvas-container').classList.toggle('pen-active', penEnabled);
             togglePenBtn.classList.toggle('bg-blue-600', penEnabled);
             togglePenBtn.classList.toggle('bg-slate-700', !penEnabled);
-            togglePenBtn.classList.toggle('text-white', penEnabled);
-            togglePenBtn.classList.toggle('text-slate-400', !penEnabled);
         });
 
-        document.getElementById('clear-pen-btn').onclick = () => {
-            if(confirm("Clear notes?")) ctx.clearRect(0,0,canvas.width,canvas.height);
-        };
+        document.getElementById('clear-pen-btn').onclick = () => { if(confirm("Clear notes?")) ctx.clearRect(0,0,canvas.width,canvas.height); };
 
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+            return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
         }
 
         canvas.onmousedown = (e) => { if(!penEnabled) return; isDrawing = true; const c = getCoords(e); ctx.beginPath(); ctx.moveTo(c.x, c.y); };
         canvas.onmousemove = (e) => { if(!isDrawing) return; const c = getCoords(e); ctx.lineWidth = 2.5; ctx.strokeStyle = '#2563eb'; ctx.lineTo(c.x, c.y); ctx.stroke(); };
         window.onmouseup = () => isDrawing = false;
 
-        document.getElementById('close-modal').onclick = () => {
-            modal.classList.add('hidden');
-            currentlyViewingId = null;
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            penEnabled = false;
-            document.getElementById('canvas-container').classList.remove('pen-active');
-        };
+        document.getElementById('close-modal').onclick = () => { modal.classList.add('hidden'); currentlyViewingId = null; ctx.clearRect(0,0,canvas.width,canvas.height); };
 
-        // FIREBASE SYNC
         async function initDashboard() {
-            try {
-                await signInAnonymously(auth);
-                listenToSubmissions();
-            } catch (err) { console.error(err); }
+            try { await signInAnonymously(auth); listenToSubmissions(); } catch (e) { console.error(e); }
         }
 
         function listenToSubmissions() {
@@ -357,7 +291,7 @@
             grid.innerHTML = '';
 
             const filtered = allSubmissions
-                .filter(s => (s.studentName||'').toLowerCase().includes(search))
+                .filter(s => (s.studentName||'').toLowerCase().includes(search) || (s.assignment||'').toLowerCase().includes(search))
                 .sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
 
             if(!filtered.length) { document.getElementById('empty-state').classList.remove('hidden'); return; }
@@ -371,25 +305,36 @@
                 if(isActive) active++;
 
                 const card = document.createElement('div');
-                card.className = `bg-slate-900 border ${isActive ? 'border-emerald-500/50' : 'border-slate-800'} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer`;
+                card.className = `bg-slate-900 border ${isActive ? 'border-emerald-500/50' : 'border-slate-800'} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer flex flex-col h-full`;
                 
-                const head = document.createElement('div');
-                head.className = "flex justify-between items-start mb-2";
-                head.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div><span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span></div>`;
+                const header = document.createElement('div');
+                header.className = "flex justify-between items-start mb-2";
+                header.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div><span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span></div>`;
                 
                 if(sub.grade) {
                     const g = document.createElement('span');
                     g.className = "text-[10px] font-bold text-blue-400 bg-blue-900/30 px-2 rounded border border-blue-800";
                     g.textContent = `${sub.grade}/100`;
-                    head.appendChild(g);
+                    header.appendChild(g);
                 }
 
-                const n = document.createElement('h3');
-                n.className = "font-bold text-white truncate";
-                n.textContent = sub.studentName || 'Unknown';
+                const name = document.createElement('h3');
+                name.className = "font-bold text-white truncate";
+                name.textContent = sub.studentName || 'Unknown';
 
-                card.appendChild(head);
-                card.appendChild(n);
+                const assign = document.createElement('p');
+                assign.className = "text-[10px] text-blue-500 font-medium truncate mb-4";
+                assign.textContent = sub.assignment || 'Untitled Assignment';
+
+                const footer = document.createElement('div');
+                footer.className = "flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-800 pt-3 mt-auto";
+                footer.innerHTML = `<span>${sub.wordCount || 0} words</span><button class="bg-blue-600 text-white px-3 py-1 rounded font-bold uppercase tracking-tighter">Review</button>`;
+
+                card.appendChild(header);
+                card.appendChild(name);
+                card.appendChild(assign);
+                card.appendChild(footer);
+                
                 card.onclick = () => openReview(sub);
                 grid.appendChild(card);
             });
@@ -419,8 +364,9 @@
 
         async function openReview(sub) {
             currentlyViewingId = sub.id;
-            document.getElementById('modal-student-name').innerText = sub.studentName || 'Student';
-            document.getElementById('modal-assignment').innerText = sub.assignment || 'Assignment';
+            document.getElementById('modal-student-name').textContent = sub.studentName || 'Student';
+            document.getElementById('modal-assignment').textContent = sub.assignment || 'Assignment';
+            document.getElementById('modal-word-count').textContent = `${sub.wordCount || 0} words`;
             document.getElementById('grade-input').value = sub.grade || '';
             modalContent.textContent = sub.content || "";
             modal.classList.remove('hidden');
@@ -441,7 +387,7 @@
                 });
                 indicator.style.opacity = '0';
                 renderUI();
-            } catch (e) { alert("Save failed: Check your Teacher ID is in the Firebase Rules."); }
+            } catch (e) { alert("Error: " + e.message); }
         };
 
         document.getElementById('download-zip-btn').onclick = async () => {
@@ -456,9 +402,8 @@
 
         document.getElementById('export-btn').onclick = () => {
             const csv = ["Name,Assignment,Grade"].concat(allSubmissions.map(s => `"${s.studentName}","${s.assignment}","${s.grade||''}"`));
-            const blob = new Blob([csv.join("\n")], {type: 'text/csv'});
             const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
+            link.href = URL.createObjectURL(new Blob([csv.join("\n")], {type: 'text/csv'}));
             link.download = "grades.csv";
             link.click();
         };
