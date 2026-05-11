@@ -24,9 +24,8 @@
             font-family: 'Crimson Pro', serif;
             font-size: 1.25rem;
             position: relative;
-            /* Force fixed width for annotation accuracy */
             width: 800px; 
-            min-height: 1056px; /* A4 Ratio roughly */
+            min-height: 1056px; 
             box-sizing: border-box;
         }
 
@@ -47,6 +46,11 @@
             width: 800px;
             margin: 0 auto;
         }
+
+        /* Gradebook Table Styles */
+        .gradebook-table th { @apply text-left p-4 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800; }
+        .gradebook-table td { @apply p-4 text-sm border-b border-slate-800/50; }
+        .gradebook-table tr:hover { @apply bg-slate-900/50; }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen p-4 md:p-8">
@@ -55,10 +59,13 @@
         <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
             <div>
                 <h1 class="text-3xl font-bold text-white tracking-tight">Exam Control Tower</h1>
-                <p class="text-slate-500 font-medium tracking-wide mt-1">Grade 10 History Portal: Live Monitoring</p>
+                <div class="flex items-center gap-4 mt-2">
+                    <button id="view-monitor-btn" class="text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg">Live Monitor</button>
+                    <button id="view-gradebook-btn" class="text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition">Class Gradebook</button>
+                </div>
             </div>
             
-            <div class="flex flex-wrap items-end gap-3 w-full md:w-auto">
+            <div id="header-controls" class="flex flex-wrap items-end gap-3 w-full md:w-auto">
                 <div class="flex-1 min-w-[200px]">
                     <input type="text" id="search-input" placeholder="Search students..." class="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm">
                 </div>
@@ -73,9 +80,27 @@
         </header>
 
         <main class="max-w-7xl mx-auto pb-12">
-            <div id="loading-indicator" class="text-center py-12 text-slate-500">Connecting...</div>
+            <div id="loading-indicator" class="text-center py-12 text-slate-500 font-bold animate-pulse">Establishing Secure Uplink...</div>
+            
+            <!-- Monitor View -->
             <div id="student-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden"></div>
-            <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">No assessments found.</div>
+            
+            <!-- Gradebook View -->
+            <div id="gradebook-view" class="hidden bg-slate-900/30 rounded-2xl border border-slate-800 overflow-hidden">
+                <table class="w-full gradebook-table">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Completed Tasks</th>
+                            <th>Individual Scores</th>
+                            <th class="text-right">Course Average</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gradebook-body"></tbody>
+                </table>
+            </div>
+
+            <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">No assessments found in this project.</div>
         </main>
     </div>
 
@@ -143,19 +168,37 @@
 
         let allSubmissions = [];
         let currentlyViewingId = null;
+        let currentView = 'monitor'; // 'monitor' or 'gradebook'
 
         const grid = document.getElementById('student-grid');
+        const gradebookView = document.getElementById('gradebook-view');
         const modal = document.getElementById('view-modal');
         const modalContent = document.getElementById('modal-content');
         const canvas = document.getElementById('annotation-canvas');
         const ctx = canvas.getContext('2d', { alpha: true });
         const togglePenBtn = document.getElementById('toggle-pen-btn');
+        const monitorBtn = document.getElementById('view-monitor-btn');
+        const gradebookBtn = document.getElementById('view-gradebook-btn');
         
         let isDrawing = false;
         let penEnabled = false;
 
+        // View Toggles
+        monitorBtn.onclick = () => {
+            currentView = 'monitor';
+            monitorBtn.className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
+            gradebookBtn.className = "text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition";
+            renderUI();
+        };
+
+        gradebookBtn.onclick = () => {
+            currentView = 'gradebook';
+            gradebookBtn.className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
+            monitorBtn.className = "text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition";
+            renderUI();
+        };
+
         function resizeCanvas() {
-            // Match the paper texture exactly
             canvas.width = 800;
             canvas.height = modalContent.scrollHeight;
             canvas.style.width = '800px';
@@ -181,15 +224,9 @@
             const rect = canvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
-            // Calculate scale in case the browser is zoomed
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-
-            return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
-            };
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
         function startDrawing(e) {
@@ -240,8 +277,18 @@
             onSnapshot(submissionsRef, (snapshot) => {
                 allSubmissions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 document.getElementById('loading-indicator').classList.add('hidden');
-                renderGrid();
+                renderUI();
             });
+        }
+
+        function renderUI() {
+            if (currentView === 'monitor') {
+                gradebookView.classList.add('hidden');
+                renderGrid();
+            } else {
+                grid.classList.add('hidden');
+                renderGradebook();
+            }
         }
 
         function renderGrid() {
@@ -288,6 +335,56 @@
             document.getElementById('active-count').innerText = active;
         }
 
+        function renderGradebook() {
+            const body = document.getElementById('gradebook-body');
+            body.innerHTML = '';
+            gradebookView.classList.remove('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
+
+            // Group by student
+            const students = {};
+            allSubmissions.forEach(sub => {
+                if (!students[sub.studentName]) {
+                    students[sub.studentName] = { assignments: [], totalGrade: 0, gradedCount: 0 };
+                }
+                students[sub.studentName].assignments.push(sub);
+                if (sub.grade) {
+                    students[sub.studentName].totalGrade += parseFloat(sub.grade);
+                    students[sub.studentName].gradedCount++;
+                }
+            });
+
+            // Sort alphabetically
+            const sortedNames = Object.keys(students).sort();
+
+            sortedNames.forEach(name => {
+                const data = students[name];
+                const avg = data.gradedCount > 0 ? (data.totalGrade / data.gradedCount).toFixed(1) : '---';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="font-bold text-white">${name}</td>
+                    <td><span class="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">${data.assignments.length} Tasks</span></td>
+                    <td>
+                        <div class="flex flex-wrap gap-2">
+                            ${data.assignments.map(a => `
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] text-slate-500 truncate w-24 uppercase font-bold">${a.assignment}</span>
+                                    <span class="text-xs ${a.grade ? 'text-blue-400 font-bold' : 'text-slate-600 italic'}">${a.grade ? a.grade + '%' : 'Unmarked'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td class="text-right">
+                        <span class="text-xl font-mono font-bold ${avg !== '---' ? (avg >= 50 ? 'text-emerald-400' : 'text-amber-500') : 'text-slate-700'}">
+                            ${avg}${avg !== '---' ? '%' : ''}
+                        </span>
+                    </td>
+                `;
+                body.appendChild(row);
+            });
+        }
+
         async function openReview(sub) {
             currentlyViewingId = sub.id;
             document.getElementById('modal-student-name').innerText = sub.studentName || 'Student';
@@ -298,7 +395,6 @@
             
             modal.classList.remove('hidden');
             
-            // Wait for DOM reflow
             setTimeout(() => {
                 resizeCanvas();
                 if (sub.annotations) {
@@ -325,12 +421,18 @@
                     annotations: dataUrl
                 });
                 btn.innerText = "SAVED";
-                setTimeout(() => { btn.innerText = "SAVE ALL"; btn.disabled = false; indicator.style.opacity = '0'; }, 1000);
+                setTimeout(() => { 
+                    btn.innerText = "SAVE ALL"; 
+                    btn.disabled = false; 
+                    indicator.style.opacity = '0'; 
+                    // Refresh view to show updated grade
+                    renderUI();
+                }, 1000);
             } catch (e) { alert("Save failed: " + e.message); btn.disabled = false; }
         };
 
-        document.getElementById('search-input').oninput = renderGrid;
-        setInterval(renderGrid, 30000);
+        document.getElementById('search-input').oninput = renderUI;
+        setInterval(renderUI, 30000);
 
         document.getElementById('download-zip-btn').onclick = async () => {
             const zip = new JSZip();
