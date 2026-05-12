@@ -66,14 +66,15 @@
                 </svg>
             </div>
             <h2 class="text-xl font-bold text-white mb-2">Teacher Access Required</h2>
-            <p class="text-slate-500 text-sm mb-6">Enter your security key to view the Control Tower.</p>
+            <p class="text-slate-500 text-sm mb-6">Enter your credentials to view the Control Tower.</p>
             
             <form id="login-form" class="space-y-4">
-                <input type="password" id="access-key" autocomplete="current-password" placeholder="Enter Security Key" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest" required autofocus>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition shadow-lg">
+                <input type="email" id="teacher-email" autocomplete="username" placeholder="Teacher Email" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest mb-2" required autofocus>
+                <input type="password" id="access-key" autocomplete="current-password" placeholder="Enter Password" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest" required>
+                <button type="submit" id="login-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition shadow-lg">
                     Unlock Dashboard
                 </button>
-                <p id="login-error" class="text-red-500 text-xs font-semibold hidden">Invalid Security Key</p>
+                <p id="login-error" class="text-red-500 text-xs font-semibold hidden">Invalid Email or Password</p>
             </form>
         </div>
     </div>
@@ -177,14 +178,13 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
+            apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjenoJYI7ls",
             authDomain: "canadian-history-portal.firebaseapp.com",
             projectId: "canadian-history-portal",
             storageBucket: "canadian-history-portal.firebasestorage.app",
@@ -192,8 +192,6 @@
             appId: "1:21075780226:web:7b6d9b938e7bedb9e80a9b"
         };
         
-        const TEACHER_PASSWORD_HASH = "4c23fb39df853626ea346e6e7e5512ad";
-
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -223,26 +221,33 @@
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
-        if (sessionStorage.getItem('teacher_authenticated') === 'true') { unlockDashboard(); }
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (CryptoJS.MD5(accessInput.value).toString() === TEACHER_PASSWORD_HASH) {
-                sessionStorage.setItem('teacher_authenticated', 'true');
-                unlockDashboard();
+        // Check authentication state
+        onAuthStateChanged(auth, (user) => {
+            if (user && !user.isAnonymous) {
+                loginOverlay.classList.add('hidden');
+                dashContent.classList.remove('invisible');
+                listenToSubmissions();
             } else {
-                document.getElementById('login-error').classList.remove('hidden');
-                accessInput.value = '';
+                loginOverlay.classList.remove('hidden');
+                dashContent.classList.add('invisible');
             }
         });
 
-        accessInput.addEventListener('input', () => { document.getElementById('login-error').classList.add('hidden'); });
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            btn.innerText = "Authenticating...";
+            
+            try {
+                await signInWithEmailAndPassword(auth, document.getElementById('teacher-email').value, document.getElementById('access-key').value);
+                // Success is automatically handled by onAuthStateChanged above
+            } catch (err) {
+                document.getElementById('login-error').classList.remove('hidden');
+                btn.innerText = "Unlock Dashboard";
+            }
+        });
 
-        function unlockDashboard() {
-            loginOverlay.classList.add('hidden');
-            dashContent.classList.remove('invisible');
-            initDashboard();
-        }
+        document.getElementById('access-key').addEventListener('input', () => { document.getElementById('login-error').classList.add('hidden'); });
 
         monitorBtn.onclick = () => { currentView = 'monitor'; updateViewStyles(); renderUI(); };
         gradebookBtn.onclick = () => { currentView = 'gradebook'; updateViewStyles(); renderUI(); };
@@ -310,13 +315,9 @@
                 currentlyViewingId = null;
                 renderUI();
             } catch (e) {
-                alert("Permission Denied: Make sure your Teacher ID is in the Firebase Rules for 'delete'.");
+                alert("Permission Denied: Ensure your email is in the Firebase Rules for 'delete'.");
             }
         };
-
-        async function initDashboard() {
-            try { await signInAnonymously(auth); listenToSubmissions(); } catch (e) { console.error(e); }
-        }
 
         function listenToSubmissions() {
             const ref = collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions');
@@ -324,6 +325,9 @@
                 allSubmissions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 document.getElementById('loading-indicator').classList.add('hidden');
                 renderUI();
+            }, (error) => {
+                document.getElementById('loading-indicator').innerText = "Access Denied: Your email is not authorized in Firebase Rules.";
+                console.error("Firebase Rule Blocked Access:", error);
             });
         }
 
