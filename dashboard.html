@@ -242,7 +242,19 @@
                 await signInWithEmailAndPassword(auth, document.getElementById('teacher-email').value, document.getElementById('access-key').value);
                 // Success is automatically handled by onAuthStateChanged above
             } catch (err) {
-                document.getElementById('login-error').classList.remove('hidden');
+                console.error("Firebase Login Error:", err);
+                const errorEl = document.getElementById('login-error');
+                
+                // Show the exact Firebase error message on the screen
+                if (err.code === 'auth/invalid-credential') {
+                    errorEl.innerText = "Incorrect email or password.";
+                } else if (err.code === 'auth/operation-not-allowed') {
+                    errorEl.innerText = "Email/Password sign-in is turned off in Firebase.";
+                } else {
+                    errorEl.innerText = "Error: " + err.message;
+                }
+                
+                errorEl.classList.remove('hidden');
                 btn.innerText = "Unlock Dashboard";
             }
         });
