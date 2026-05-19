@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Dashboard - Control Tower</title>
+    <title>Grade 10 History - Teacher Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #020617; font-family: sans-serif; color: white; }
-        .paper-texture { background-color: #fffdfa; color: black; font-family: serif; font-size: 1.25rem; padding: 40px; }
+        .paper-texture { background-color: #fffdfa; color: black; font-family: serif; padding: 40px; }
         #annotation-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
         .pen-active #annotation-canvas { pointer-events: auto; cursor: crosshair; }
     </style>
@@ -32,7 +32,6 @@
                 <div class="flex gap-2">
                     <button id="toggle-pen" class="bg-slate-700 px-3 py-1 rounded text-xs font-bold">Blue Pen</button>
                     <button id="clear-pen" class="text-red-400 px-3 py-1 rounded text-xs font-bold">Clear</button>
-                    <input type="number" id="grade-input" class="w-16 bg-slate-950 px-2 rounded text-sm text-center">
                     <button id="save-btn" class="bg-blue-600 px-3 py-1 rounded text-xs font-bold">Save</button>
                     <button id="close-modal" class="text-slate-500 px-2 font-bold">Close</button>
                 </div>
@@ -46,6 +45,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -58,6 +58,7 @@
         };
         
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = 'history-portal-g10';
 
@@ -66,26 +67,27 @@
         let isPen = false;
         let currentId = null;
 
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'), (snap) => {
-            const grid = document.getElementById('student-grid');
-            grid.innerHTML = '';
-            let active = 0;
-            snap.docs.forEach(d => {
-                const sub = {id: d.id, ...d.data()};
-                if (!sub.submitted) active++;
-                const div = document.createElement('div');
-                div.className = "bg-slate-900 border border-slate-700 p-4 rounded-xl cursor-pointer hover:border-blue-500";
-                div.innerHTML = `<h3 class="font-bold">${sub.studentName}</h3><p class="text-xs text-slate-400">${sub.assignment}</p>`;
-                div.onclick = () => openModal(sub);
-                grid.appendChild(div);
+        signInAnonymously(auth).then(() => {
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'), (snap) => {
+                const grid = document.getElementById('student-grid');
+                grid.innerHTML = '';
+                let active = 0;
+                snap.docs.forEach(d => {
+                    const sub = {id: d.id, ...d.data()};
+                    if (!sub.submitted) active++;
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-900 border border-slate-700 p-4 rounded-xl cursor-pointer hover:border-blue-500";
+                    div.innerHTML = `<h3 class="font-bold">${sub.studentName}</h3><p class="text-xs text-slate-400">${sub.assignment}</p>`;
+                    div.onclick = () => openModal(sub);
+                    grid.appendChild(div);
+                });
+                document.getElementById('active-count').innerText = active;
             });
-            document.getElementById('active-count').innerText = active;
         });
 
         function openModal(sub) {
             currentId = sub.id;
             document.getElementById('modal-name').innerText = sub.studentName;
-            document.getElementById('grade-input').value = sub.grade || '';
             document.getElementById('modal-content').innerText = sub.content;
             
             canvas.width = 800;
@@ -112,10 +114,9 @@
 
         document.getElementById('save-btn').onclick = async () => {
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'submissions', currentId), {
-                grade: document.getElementById('grade-input').value,
                 annotations: canvas.toDataURL()
             });
-            alert("Saved");
+            alert("Annotation Saved");
         };
 
         document.getElementById('close-modal').onclick = () => document.getElementById('view-modal').classList.add('hidden');
@@ -123,3 +124,6 @@
     </script>
 </body>
 </html>
+```
+
+Paste this into your `dashboard.html` and update those Firestore rules, and the dashboard will go back to being the fast, simple tool that worked on Friday!
