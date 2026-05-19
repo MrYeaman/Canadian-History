@@ -3,87 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grade 10 History - Teacher Dashboard</title>
+    <title>Teacher Dashboard - Control Tower</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap');
-        body { background-color: #020617; font-family: 'Inter', sans-serif; }
-        .paper-texture { background-color: #fffdfa; background-image: linear-gradient(#e5e5e5 1px, transparent 1px); background-size: 100% 2.5rem; line-height: 2.5rem; font-family: 'Crimson Pro', serif; font-size: 1.25rem; position: relative; width: 800px; min-height: 1056px; box-sizing: border-box; }
-        #annotation-canvas { position: absolute; top: 0; left: 0; pointer-events: none; cursor: crosshair; z-index: 20; }
-        .pen-active #annotation-canvas { pointer-events: auto; }
-        #canvas-container { width: 800px; margin: 0 auto; }
-        .gradebook-table th { @apply text-left p-4 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800; }
-        .gradebook-table td { @apply p-4 text-sm border-b border-slate-800/50; }
-        .gradebook-table tr:hover { @apply bg-slate-900/50; }
-        .blur-bg { backdrop-filter: blur(12px); }
+        body { background-color: #020617; font-family: sans-serif; color: white; }
+        .paper-texture { background-color: #fffdfa; color: black; font-family: serif; font-size: 1.25rem; padding: 40px; }
+        #annotation-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+        .pen-active #annotation-canvas { pointer-events: auto; cursor: crosshair; }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen p-4 md:p-8">
+<body class="p-8">
 
-    <div id="login-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4 blur-bg">
-        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
-            <h2 class="text-xl font-bold text-white mb-6">Teacher Access Required</h2>
-            <form id="login-form" class="space-y-4">
-                <input type="email" id="email" placeholder="Email" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg text-center" required>
-                <input type="password" id="password" placeholder="Password" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg text-center" required>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition">Login</button>
-            </form>
+    <header class="max-w-7xl mx-auto mb-8 flex justify-between items-center border-b border-slate-800 pb-6">
+        <h1 class="text-3xl font-bold">Exam Control Tower</h1>
+        <div class="flex items-center gap-4">
+            <span id="active-count" class="text-2xl font-bold text-blue-400">0</span>
+            <span class="text-slate-500 uppercase text-xs font-bold tracking-widest">Active</span>
         </div>
-    </div>
+    </header>
 
-    <div id="dashboard-content" class="invisible">
-        <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
-            <div>
-                <h1 class="text-3xl font-bold text-white tracking-tight">Exam Control Tower</h1>
-                <div class="flex items-center gap-4 mt-2">
-                    <button id="view-monitor-btn" class="text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg">Monitor</button>
-                    <button id="view-gradebook-btn" class="text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400">Gradebook</button>
-                </div>
-            </div>
-            <div class="flex gap-2">
-                <button id="export-btn" class="bg-slate-800 px-4 py-2 rounded text-xs font-bold border border-slate-700">CSV</button>
-                <button id="download-zip-btn" class="bg-blue-600 px-4 py-2 rounded text-xs font-bold">Download ZIP</button>
-            </div>
-        </header>
+    <main class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6" id="student-grid"></main>
 
-        <main class="max-w-7xl mx-auto pb-12">
-            <div id="student-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
-            <div id="gradebook-view" class="hidden bg-slate-900/30 rounded-2xl border border-slate-800 p-6">
-                <table class="w-full gradebook-table"><tbody id="gradebook-body"></tbody></table>
-            </div>
-        </main>
-    </div>
-
+    <!-- Reading Modal -->
     <div id="view-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 rounded-xl w-full max-w-6xl max-h-[95vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
-            <div class="p-4 border-b border-slate-800 flex justify-between bg-slate-900">
-                <div>
-                    <h2 id="modal-student-name" class="text-lg font-bold">Student Name</h2>
-                    <p id="modal-assignment" class="text-blue-400 text-[10px] uppercase">Assignment</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="toggle-pen-btn" class="bg-slate-700 px-3 py-1 rounded text-[10px] font-bold uppercase">Blue Pen</button>
-                    <input type="number" id="grade-input" class="w-16 bg-slate-950 px-2 py-1 rounded text-sm text-center">
-                    <button id="save-grade-btn" class="bg-blue-600 px-3 py-1 rounded text-[10px] font-bold uppercase">Save</button>
-                    <button id="close-modal" class="text-slate-500">Close</button>
+        <div class="bg-slate-900 w-full max-w-4xl h-[90vh] rounded-xl flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h2 id="modal-name" class="font-bold text-lg"></h2>
+                <div class="flex gap-2">
+                    <button id="toggle-pen" class="bg-slate-700 px-3 py-1 rounded text-xs font-bold">Blue Pen</button>
+                    <button id="clear-pen" class="text-red-400 px-3 py-1 rounded text-xs font-bold">Clear</button>
+                    <input type="number" id="grade-input" class="w-16 bg-slate-950 px-2 rounded text-sm text-center">
+                    <button id="save-btn" class="bg-blue-600 px-3 py-1 rounded text-xs font-bold">Save</button>
+                    <button id="close-modal" class="text-slate-500 px-2 font-bold">Close</button>
                 </div>
             </div>
-            <div id="modal-scroll-area" class="flex-1 overflow-y-auto bg-slate-800/50 p-8">
-                <div id="canvas-container" class="relative">
-                    <div id="modal-content" class="paper-texture p-16 whitespace-pre-wrap"></div>
-                    <canvas id="annotation-canvas"></canvas>
-                </div>
+            <div id="modal-container" class="flex-1 overflow-auto bg-slate-200 relative">
+                <div id="modal-content" class="paper-texture"></div>
+                <canvas id="annotation-canvas"></canvas>
             </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // IMPORTANT: Double check these keys in your Firebase Project Settings!
         const firebaseConfig = {
             apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
             authDomain: "canadian-history-portal.firebaseapp.com",
@@ -94,59 +58,68 @@
         };
         
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
-        const targetAppId = 'history-portal-g10';
+        const appId = 'history-portal-g10';
 
-        let allSubmissions = [];
-        let currentlyViewingId = null;
+        const canvas = document.getElementById('annotation-canvas');
+        const ctx = canvas.getContext('2d');
+        let isPen = false;
+        let currentId = null;
 
-        document.getElementById('login-form').onsubmit = async (e) => {
-            e.preventDefault();
-            try {
-                await signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value);
-                document.getElementById('login-overlay').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('invisible');
-                initDashboard();
-            } catch (err) { alert(err.message); }
-        };
-
-        function initDashboard() {
-            onSnapshot(collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions'), (snap) => {
-                allSubmissions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderUI();
-            });
-        }
-
-        function renderUI() {
+        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'), (snap) => {
             const grid = document.getElementById('student-grid');
             grid.innerHTML = '';
-            allSubmissions.sort((a,b) => (a.studentName||'').localeCompare(b.studentName||'')).forEach(sub => {
-                const card = document.createElement('div');
-                card.className = "bg-slate-900 border border-slate-700 p-4 rounded-xl cursor-pointer hover:bg-slate-800";
-                card.innerHTML = `<h3 class="font-bold">${sub.studentName}</h3><p class="text-[10px] text-slate-400">${sub.assignment}</p>`;
-                card.onclick = () => openReview(sub);
-                grid.appendChild(card);
+            let active = 0;
+            snap.docs.forEach(d => {
+                const sub = {id: d.id, ...d.data()};
+                if (!sub.submitted) active++;
+                const div = document.createElement('div');
+                div.className = "bg-slate-900 border border-slate-700 p-4 rounded-xl cursor-pointer hover:border-blue-500";
+                div.innerHTML = `<h3 class="font-bold">${sub.studentName}</h3><p class="text-xs text-slate-400">${sub.assignment}</p>`;
+                div.onclick = () => openModal(sub);
+                grid.appendChild(div);
             });
-        }
+            document.getElementById('active-count').innerText = active;
+        });
 
-        function openReview(sub) {
-            currentlyViewingId = sub.id;
-            document.getElementById('modal-student-name').innerText = sub.studentName;
-            document.getElementById('modal-content').textContent = sub.content;
+        function openModal(sub) {
+            currentId = sub.id;
+            document.getElementById('modal-name').innerText = sub.studentName;
+            document.getElementById('grade-input').value = sub.grade || '';
+            document.getElementById('modal-content').innerText = sub.content;
+            
+            canvas.width = 800;
+            canvas.height = document.getElementById('modal-content').scrollHeight;
+            
+            if(sub.annotations) {
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = sub.annotations;
+            } else {
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+            }
             document.getElementById('view-modal').classList.remove('hidden');
         }
 
-        // Add Pen & Annotation Logic here (as previously established)
-        // ...
-        
-        document.getElementById('save-grade-btn').onclick = async () => {
-            await updateDoc(doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId), {
-                grade: document.getElementById('grade-input').value
-            });
-            alert("Grade Saved");
+        document.getElementById('toggle-pen').onclick = (e) => {
+            isPen = !isPen;
+            document.getElementById('modal-container').classList.toggle('pen-active', isPen);
+            e.target.className = isPen ? "bg-blue-600 px-3 py-1 rounded text-xs font-bold" : "bg-slate-700 px-3 py-1 rounded text-xs font-bold";
         };
 
+        canvas.onpointerdown = (e) => { if(isPen) { ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); } };
+        canvas.onpointermove = (e) => { if(isPen && e.buttons === 1) { ctx.lineWidth = 2; ctx.strokeStyle = 'blue'; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } };
+
+        document.getElementById('save-btn').onclick = async () => {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'submissions', currentId), {
+                grade: document.getElementById('grade-input').value,
+                annotations: canvas.toDataURL()
+            });
+            alert("Saved");
+        };
+
+        document.getElementById('close-modal').onclick = () => document.getElementById('view-modal').classList.add('hidden');
+        document.getElementById('clear-pen').onclick = () => ctx.clearRect(0,0,canvas.width,canvas.height);
     </script>
 </body>
 </html>
