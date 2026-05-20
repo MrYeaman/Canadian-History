@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grade 10 History - Teacher Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap');
         
@@ -24,34 +24,41 @@
             font-family: 'Crimson Pro', serif;
             font-size: 1.25rem;
             position: relative;
-            width: 100%;
-            max-width: 800px; 
+            width: 800px; 
             min-height: 1056px; 
-            margin: 0 auto;
             box-sizing: border-box;
         }
 
+        /* CRUCIAL APPLE PENCIL FIX */
         #annotation-canvas {
             position: absolute;
             top: 0;
             left: 0;
             pointer-events: none;
+            cursor: crosshair;
             z-index: 20;
-            touch-action: none; /* CRITICAL FOR APPLE PENCIL */
+            touch-action: none; /* Prevents iPad from scrolling when drawing */
         }
 
         .pen-active #annotation-canvas {
             pointer-events: auto;
-            cursor: crosshair;
+        }
+        
+        #canvas-container {
+            width: 800px;
+            margin: 0 auto;
         }
 
+        .gradebook-table th { @apply text-left p-4 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-800; }
+        .gradebook-table td { @apply p-4 text-sm border-b border-slate-800/50; }
+        .gradebook-table tr:hover { @apply bg-slate-900/50; }
+
         .blur-bg { backdrop-filter: blur(12px); }
-        .hidden { display: none !important; }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen p-4 md:p-8">
 
-    <!-- PASSWORD PROTECTION OVERLAY -->
+    <!-- EMAIL LOGIN OVERLAY -->
     <div id="login-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4 blur-bg">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
             <div class="bg-blue-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-400">
@@ -60,51 +67,86 @@
                 </svg>
             </div>
             <h2 class="text-xl font-bold text-white mb-2">Teacher Access Required</h2>
-            <p class="text-slate-500 text-sm mb-6">Enter your security key to view the Control Tower.</p>
+            <p class="text-slate-500 text-sm mb-6">Log in to view the Control Tower.</p>
             
             <form id="login-form" class="space-y-4">
-                <input type="password" id="access-key" autocomplete="current-password" placeholder="Enter Security Key" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest" required autofocus>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition shadow-lg">
-                    Unlock Dashboard
+                <input type="email" id="teacher-email" autocomplete="email" placeholder="Teacher Email" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center" required>
+                <input type="password" id="teacher-pass" autocomplete="current-password" placeholder="Password" class="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center tracking-widest" required>
+                <button type="submit" id="login-submit-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition shadow-lg">
+                    Secure Login
                 </button>
-                <p id="login-error" class="text-red-500 text-xs font-semibold hidden">Invalid Security Key</p>
+                <p id="login-error" class="text-red-500 text-xs font-semibold hidden">Authentication Failed.</p>
             </form>
         </div>
     </div>
 
     <!-- MAIN DASHBOARD -->
-    <div id="dashboard-content" class="hidden">
-        <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
+    <div id="dashboard-content" class="invisible flex flex-col min-h-screen">
+        <header class="max-w-7xl w-full mx-auto mb-8 flex flex-col md:flex-row justify-between items-end border-b border-slate-800 pb-6 gap-6">
             <div>
                 <h1 class="text-3xl font-bold text-white tracking-tight">Exam Control Tower</h1>
-                <p class="text-slate-500 font-medium tracking-wide mt-1">Grade 10 History Portal: Live Monitoring</p>
+                <div class="flex items-center gap-4 mt-2">
+                    <button id="view-monitor-btn" class="text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg">Live Monitor</button>
+                    <button id="view-gradebook-btn" class="text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition">Class Gradebook</button>
+                </div>
             </div>
             
-            <div class="flex items-center gap-4">
-                <div class="bg-slate-900 px-6 py-2 rounded-lg border border-slate-800 text-center flex items-center gap-4">
-                    <span class="text-xs text-slate-500 uppercase font-black tracking-widest">Active Writers</span>
-                    <span id="active-count" class="text-2xl font-mono font-bold text-emerald-400">0</span>
+            <div id="header-controls" class="flex flex-wrap items-end gap-3 w-full md:w-auto">
+                <div class="flex-1 min-w-[200px]">
+                    <input type="text" id="search-input" placeholder="Search students..." class="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm">
+                </div>
+                <div class="flex gap-2">
+                    <button id="export-btn" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg text-sm h-[38px] border border-slate-700">CSV</button>
+                    <button id="download-zip-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-bold transition shadow-lg text-sm h-[38px]">Download ZIP</button>
+                    <button id="logout-btn" class="bg-red-900/30 hover:bg-red-900 text-red-500 hover:text-white px-4 py-2 rounded-lg font-bold transition text-sm h-[38px] border border-red-900/50 ml-2">Log Out</button>
+                </div>
+                <div class="bg-slate-900 px-6 py-1.5 rounded-lg border border-slate-800 text-center h-[38px] flex flex-col justify-center">
+                    <span id="active-count" class="text-xl font-mono font-bold text-emerald-400 leading-none">0</span>
                 </div>
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto pb-12">
+        <main class="max-w-7xl w-full mx-auto pb-12 flex-1">
             <div id="loading-indicator" class="text-center py-12 text-slate-500 font-bold animate-pulse">Establishing Secure Uplink...</div>
             <div id="student-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden"></div>
+            <div id="gradebook-view" class="hidden bg-slate-900/30 rounded-2xl border border-slate-800 overflow-hidden">
+                <table class="w-full gradebook-table">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Completed Tasks</th>
+                            <th>Individual Scores</th>
+                            <th class="text-right">Course Average</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gradebook-body"></tbody>
+                </table>
+            </div>
             <div id="empty-state" class="hidden text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">No assessments found.</div>
         </main>
     </div>
 
     <!-- Reading Modal -->
     <div id="view-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
-        <div class="bg-slate-900 rounded-xl w-full max-w-5xl max-h-[95vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
+        <div class="bg-slate-900 rounded-xl w-full max-w-6xl max-h-[95vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
             <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                 <div class="flex-1">
-                    <h2 id="modal-student-name" class="text-xl font-bold text-white">Student Name</h2>
+                    <h2 id="modal-student-name" class="text-xl font-bold text-white leading-tight">Student Name</h2>
                     <p id="modal-assignment" class="text-blue-400 font-medium text-xs">Assignment</p>
                 </div>
                 
                 <div class="flex items-center gap-4">
+                    <!-- Delete Button -->
+                    <div id="delete-confirm-ui" class="hidden flex items-center gap-2 bg-red-900/20 border border-red-500/50 p-1 rounded-lg">
+                        <span class="text-[10px] font-bold text-red-400 px-2 uppercase">Delete?</span>
+                        <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition">Yes</button>
+                        <button id="cancel-delete-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase transition">No</button>
+                    </div>
+                    <button id="trigger-delete-btn" class="text-red-500/50 hover:text-red-500 transition p-2" title="Delete Submission">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+
+                    <!-- Pen Tools -->
                     <div class="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700">
                         <button id="toggle-pen-btn" class="px-4 py-2 rounded-md text-[11px] font-bold uppercase transition flex items-center gap-2 bg-slate-700 text-slate-400 hover:text-white">
                             <span class="w-2 h-2 rounded-full bg-current"></span> Blue Pen
@@ -112,7 +154,12 @@
                         <button id="clear-pen-btn" class="px-3 py-2 rounded-md text-[11px] font-bold uppercase text-red-400 hover:bg-red-900/30 transition">Clear</button>
                     </div>
 
-                    <button id="save-notes-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-[11px] font-bold uppercase transition">Save Notes</button>
+                    <!-- Grading -->
+                    <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex items-center gap-2">
+                        <input type="number" id="grade-input" min="0" max="100" class="w-14 bg-slate-950 border border-slate-600 text-white rounded px-2 py-1 text-sm font-bold outline-none" placeholder="--">
+                        <span class="text-slate-500 text-xs font-bold">/100</span>
+                        <button id="save-grade-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-[11px] font-bold uppercase transition">Save All</button>
+                    </div>
                     
                     <button id="close-modal" class="text-slate-500 hover:text-white p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -120,26 +167,26 @@
                 </div>
             </div>
             
-            <div id="modal-scroll-area" class="flex-1 overflow-y-auto bg-slate-800/50 p-4 md:p-8 flex justify-center">
-                <div id="canvas-container" class="relative shadow-2xl rounded-sm w-full max-w-[800px] bg-white">
-                    <div id="modal-content" class="paper-texture text-slate-800 p-10 md:p-16 whitespace-pre-wrap"></div>
+            <div id="modal-scroll-area" class="flex-1 overflow-y-auto bg-slate-800/50 p-8">
+                <div id="canvas-container" class="relative shadow-2xl rounded-sm">
+                    <div id="modal-content" class="paper-texture text-slate-800 p-16 whitespace-pre-wrap"></div>
                     <canvas id="annotation-canvas"></canvas>
                 </div>
             </div>
             
             <div class="px-6 py-2 bg-slate-900 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between uppercase font-bold tracking-widest">
                 <span id="modal-word-count">0 words</span>
-                <span id="save-indicator" class="text-emerald-500 opacity-0 transition-opacity">Saved successfully!</span>
+                <span id="save-indicator" class="text-blue-500 opacity-0 transition-opacity">Saving...</span>
             </div>
         </div>
     </div>
 
+    <!-- MAIN DASHBOARD LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Canadian History Project Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBPlKHGjh5y8UVq7ygLhkutZFjDnJYI7ls",
             authDomain: "canadian-history-portal.firebaseapp.com",
@@ -154,298 +201,351 @@
         const db = getFirestore(app);
         const targetAppId = 'history-portal-g10';
 
-        // Hash provided by you: 4c23fb39df853626ea346e6e7e5512ad
-        const TEACHER_PASSWORD_HASH = "4c23fb39df853626ea346e6e7e5512ad";
-
         let allSubmissions = [];
         let currentlyViewingId = null;
+        let currentView = 'monitor'; 
 
         // DOM Elements
         const loginOverlay = document.getElementById('login-overlay');
+        const dashContent = document.getElementById('dashboard-content');
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
-        const accessInput = document.getElementById('access-key');
-        const dashContent = document.getElementById('dashboard-content');
+        const emailInput = document.getElementById('teacher-email');
+        const passInput = document.getElementById('teacher-pass');
+        const loginBtn = document.getElementById('login-submit-btn');
         
         const grid = document.getElementById('student-grid');
-        const activeCountEl = document.getElementById('active-count');
-        const emptyState = document.getElementById('empty-state');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        
+        const gradebookView = document.getElementById('gradebook-view');
         const modal = document.getElementById('view-modal');
         const modalContent = document.getElementById('modal-content');
-        const canvasContainer = document.getElementById('canvas-container');
         const canvas = document.getElementById('annotation-canvas');
         const ctx = canvas.getContext('2d');
         const togglePenBtn = document.getElementById('toggle-pen-btn');
 
-        if (sessionStorage.getItem('teacher_authenticated') === 'true') {
-            unlockDashboard();
-        }
-
-        accessInput.addEventListener('input', () => {
-            loginError.classList.add('hidden');
-        });
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const inputHash = CryptoJS.MD5(accessInput.value).toString();
-            
-            if (inputHash === TEACHER_PASSWORD_HASH) {
-                sessionStorage.setItem('teacher_authenticated', 'true');
-                unlockDashboard();
-            } else {
-                loginError.classList.remove('hidden');
-                accessInput.value = '';
-                accessInput.focus();
-            }
-        });
-
-        function unlockDashboard() {
-            loginOverlay.classList.add('hidden');
-            dashContent.classList.remove('hidden');
-            initDashboard();
-        }
-
-        async function initDashboard() {
-            try {
-                await signInAnonymously(auth);
+        // Authentication State Listener
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.email === 'matt_yeaman@wrdsb.ca') {
+                loginOverlay.classList.add('hidden');
+                dashContent.classList.remove('invisible');
                 listenToSubmissions();
-            } catch (err) {
-                console.error("Auth Error:", err);
-                loadingIndicator.innerHTML = `<span class="text-red-500">Authentication Failed. Check console.</span>`;
+            } else {
+                loginOverlay.classList.remove('hidden');
+                dashContent.classList.add('invisible');
             }
-        }
+        });
 
-        function listenToSubmissions() {
-            const submissionsRef = collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions');
-            onSnapshot(submissionsRef, (snapshot) => {
-                allSubmissions = [];
-                snapshot.forEach(doc => {
-                    allSubmissions.push({ id: doc.id, ...doc.data() });
-                });
-                loadingIndicator.classList.add('hidden');
-                renderGrid();
-            }, (error) => {
-                console.error("Database Error:", error);
-                loadingIndicator.innerHTML = `<span class="text-red-500">Permission Denied. Ensure Firestore rules allow read access.</span>`;
-            });
-        }
-
-        function formatTimeAgo(isoString) {
-            if (!isoString) return '---';
-            const date = new Date(isoString);
-            const seconds = Math.floor((new Date() - date) / 1000);
-            if (seconds < 60) return 'Just now';
-            const minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return `${minutes}m ago`;
-            const hours = Math.floor(minutes / 60);
-            if (hours < 24) return `${hours}h ago`;
-            return date.toLocaleDateString();
-        }
-
-        function renderGrid() {
-            const now = new Date();
-            let activeCount = 0;
-            grid.innerHTML = '';
-
-            const sorted = allSubmissions.sort((a, b) => {
-                const nameA = (a.studentName || '').toLowerCase();
-                const nameB = (b.studentName || '').toLowerCase();
-                return nameA.localeCompare(nameB);
-            });
-
-            if (sorted.length === 0) {
-                grid.classList.add('hidden');
-                emptyState.classList.remove('hidden');
-                activeCountEl.innerText = '0';
-                return;
+        // Email / Password Login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginError.classList.add('hidden');
+            loginBtn.textContent = "Authenticating...";
+            
+            try {
+                await signInWithEmailAndPassword(auth, emailInput.value, passInput.value);
+                // The onAuthStateChanged listener handles hiding the overlay
+                loginBtn.textContent = "Secure Login";
+            } catch (error) {
+                console.error("Login Failed:", error.code);
+                loginError.textContent = "Invalid Email or Password.";
+                loginError.classList.remove('hidden');
+                passInput.value = '';
+                loginBtn.textContent = "Secure Login";
             }
+        });
 
-            grid.classList.remove('hidden');
-            emptyState.classList.add('hidden');
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth);
+        });
 
-            sorted.forEach(sub => {
-                let isSubmitted = sub.submitted === true;
-                let lastUpdatedTime = new Date(sub.lastUpdated || 0);
-                let minutesSinceUpdate = (now - lastUpdatedTime) / 60000;
-                let isActive = !isSubmitted && minutesSinceUpdate < 2;
-                if (isActive) activeCount++;
+        // View Toggles
+        document.getElementById('view-monitor-btn').onclick = () => { 
+            currentView = 'monitor'; 
+            document.getElementById('view-monitor-btn').className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
+            document.getElementById('view-gradebook-btn').className = "text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition";
+            renderUI(); 
+        };
 
-                let statusColor = isSubmitted ? 'bg-slate-700' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500');
-                let statusText = isSubmitted ? 'LOCKED' : (isActive ? 'TYPING...' : 'IDLE');
-                let borderColor = isSubmitted ? 'border-slate-800' : (isActive ? 'border-emerald-500/50' : 'border-amber-500/50');
+        document.getElementById('view-gradebook-btn').onclick = () => { 
+            currentView = 'gradebook'; 
+            document.getElementById('view-gradebook-btn').className = "text-xs font-bold px-3 py-1 rounded bg-blue-600 text-white shadow-lg";
+            document.getElementById('view-monitor-btn').className = "text-xs font-bold px-3 py-1 rounded bg-slate-800 text-slate-400 hover:text-white transition";
+            renderUI(); 
+        };
 
-                const card = document.createElement('div');
-                card.className = `bg-slate-900 border ${borderColor} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer flex flex-col`;
-                
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${statusColor}"></div>
-                            <span class="text-[10px] font-black tracking-widest uppercase text-slate-400">${statusText}</span>
-                        </div>
-                        <span class="text-[10px] font-mono text-slate-500">${formatTimeAgo(sub.lastUpdated)}</span>
-                    </div>
-                    <h3 class="font-bold text-lg text-white mb-1 truncate">${sub.studentName || 'Unknown'}</h3>
-                    <p class="text-xs text-blue-400 font-bold truncate mb-4">${sub.assignment || 'No Assignment'}</p>
-                    <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-auto">
-                        <span class="text-xs text-slate-500">${sub.wordCount || 0} words</span>
-                        <button class="text-[10px] uppercase font-bold tracking-widest bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition">Review</button>
-                    </div>
-                `;
-
-                card.addEventListener('click', () => openReview(sub));
-                grid.appendChild(card);
-            });
-            activeCountEl.innerText = activeCount;
-        }
-
-        // Re-render to update relative times every 30 seconds
-        setInterval(renderGrid, 30000);
-
+        // --- APPLE PENCIL / POINTER EVENTS LOGIC ---
         let isDrawing = false;
         let penEnabled = false;
 
         function resizeCanvas() {
-            canvas.width = modalContent.offsetWidth;
+            canvas.width = 800;
             canvas.height = modalContent.scrollHeight;
-            canvas.style.width = modalContent.offsetWidth + 'px';
+            canvas.style.width = '800px';
             canvas.style.height = modalContent.scrollHeight + 'px';
+        }
+
+        togglePenBtn.addEventListener('click', () => {
+            penEnabled = !penEnabled;
+            document.getElementById('canvas-container').classList.toggle('pen-active', penEnabled);
+            togglePenBtn.classList.toggle('bg-blue-600', penEnabled);
+            togglePenBtn.classList.toggle('bg-slate-700', !penEnabled);
+            togglePenBtn.classList.toggle('text-white', penEnabled);
+            togglePenBtn.classList.toggle('text-slate-400', !penEnabled);
+        });
+
+        document.getElementById('clear-pen-btn').onclick = () => {
+            if(confirm("Wipe all blue pen notes for this student?")) ctx.clearRect(0,0,canvas.width,canvas.height);
+        };
+
+        function getPointerCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { 
+                x: (e.clientX - rect.left) * scaleX, 
+                y: (e.clientY - rect.top) * scaleY 
+            };
+        }
+
+        // Using standard Pointer Events for precise Apple Pencil tracking
+        canvas.addEventListener('pointerdown', (e) => {
+            if (!penEnabled) return;
+            e.preventDefault(); // Extra safety against scrolling
+            isDrawing = true;
+            canvas.setPointerCapture(e.pointerId);
+            const coords = getPointerCoords(e);
+            ctx.beginPath();
+            ctx.moveTo(coords.x, coords.y);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isDrawing || !penEnabled) return;
+            e.preventDefault();
+            const coords = getPointerCoords(e);
+            ctx.lineWidth = 2.5; 
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#2563eb'; // The Blue Pen color
+            ctx.lineTo(coords.x, coords.y);
+            ctx.stroke();
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            isDrawing = false;
+            canvas.releasePointerCapture(e.pointerId);
+        });
+        
+        canvas.addEventListener('pointercancel', (e) => {
+            isDrawing = false;
+            canvas.releasePointerCapture(e.pointerId);
+        });
+
+        // Modal Close
+        document.getElementById('close-modal').onclick = () => {
+            modal.classList.add('hidden');
+            currentlyViewingId = null;
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            penEnabled = false;
+            document.getElementById('canvas-container').classList.remove('pen-active');
+            document.getElementById('delete-confirm-ui').classList.add('hidden');
+            document.getElementById('trigger-delete-btn').classList.remove('hidden');
+        };
+
+        // Data Listening
+        function listenToSubmissions() {
+            const ref = collection(db, 'artifacts', targetAppId, 'public', 'data', 'submissions');
+            onSnapshot(ref, (snap) => {
+                allSubmissions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                document.getElementById('loading-indicator').classList.add('hidden');
+                renderUI();
+            }, (error) => {
+                console.error("Database Error:", error);
+            });
+        }
+
+        function renderUI() {
+            if (currentView === 'monitor') {
+                gradebookView.classList.add('hidden');
+                renderGrid();
+            } else {
+                grid.classList.add('hidden');
+                renderGradebook();
+            }
+        }
+
+        function renderGrid() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const now = new Date();
+            let active = 0;
+            grid.innerHTML = '';
+
+            const filtered = allSubmissions
+                .filter(s => (s.studentName||'').toLowerCase().includes(search) || (s.assignment||'').toLowerCase().includes(search))
+                .sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
+
+            if(!filtered.length) { document.getElementById('empty-state').classList.remove('hidden'); return; }
+            document.getElementById('empty-state').classList.add('hidden');
+            grid.classList.remove('hidden');
+
+            filtered.forEach(sub => {
+                const isSub = sub.submitted === true;
+                const lastUp = new Date(sub.lastUpdated || 0);
+                const isActive = !isSub && (now - lastUp) < 120000;
+                if(isActive) active++;
+
+                const card = document.createElement('div');
+                card.className = `bg-slate-900 border ${isActive ? 'border-emerald-500/50' : 'border-slate-800'} p-5 rounded-xl hover:bg-slate-800 transition cursor-pointer flex flex-col h-full`;
+                
+                const cardHeader = document.createElement('div');
+                cardHeader.className = "flex justify-between items-start mb-2";
+                cardHeader.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full ${isSub ? 'bg-slate-600' : (isActive ? 'bg-emerald-500 status-pulse' : 'bg-amber-500')}"></div><span class="text-[10px] font-black uppercase text-slate-500">${isSub ? 'LOCKED' : (isActive ? 'ACTIVE' : 'IDLE')}</span></div>`;
+                
+                if(sub.grade) {
+                    const g = document.createElement('span');
+                    g.className = "text-[10px] font-bold text-blue-400 bg-blue-900/30 px-2 rounded border border-blue-800";
+                    g.textContent = `${sub.grade}/100`;
+                    cardHeader.appendChild(g);
+                }
+
+                const studentNameEl = document.createElement('h3');
+                studentNameEl.className = "font-bold text-white text-lg truncate leading-tight";
+                studentNameEl.textContent = sub.studentName || 'Unknown';
+
+                const assignmentTitleEl = document.createElement('p');
+                assignmentTitleEl.className = "text-xs text-blue-500 font-bold mt-1 mb-4 block";
+                assignmentTitleEl.textContent = sub.assignment || 'Untitled Assignment';
+
+                const cardFooter = document.createElement('div');
+                cardFooter.className = "flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-800 pt-3 mt-auto";
+                cardFooter.innerHTML = `<span>${sub.wordCount || 0} words</span><button class="bg-blue-600 text-white px-3 py-1 rounded font-bold uppercase tracking-tighter">Review</button>`;
+
+                card.appendChild(cardHeader);
+                card.appendChild(studentNameEl);
+                card.appendChild(assignmentTitleEl);
+                card.appendChild(cardFooter);
+                
+                card.onclick = () => openReview(sub);
+                grid.appendChild(card);
+            });
+            document.getElementById('active-count').innerText = active;
+        }
+
+        function renderGradebook() {
+            const body = document.getElementById('gradebook-body');
+            body.innerHTML = '';
+            gradebookView.classList.remove('hidden');
+            
+            const students = {};
+            allSubmissions.forEach(sub => {
+                if (!students[sub.studentName]) students[sub.studentName] = { assignments: [], total: 0, count: 0 };
+                students[sub.studentName].assignments.push(sub);
+                if (sub.grade) { students[sub.studentName].total += parseFloat(sub.grade); students[sub.studentName].count++; }
+            });
+
+            Object.keys(students).sort().forEach(name => {
+                const d = students[name];
+                const avg = d.count > 0 ? (d.total / d.count).toFixed(1) : '---';
+                const row = document.createElement('tr');
+                row.innerHTML = `<td class="font-bold text-white">${name}</td><td><span class="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">${d.assignments.length} Tasks</span></td><td><div class="flex flex-wrap gap-2">${d.assignments.map(a => `<span class="text-xs ${a.grade ? 'text-blue-400' : 'text-slate-600'}">${a.grade || '??'}%</span>`).join('')}</div></td><td class="text-right font-mono font-bold ${avg !== '---' ? 'text-emerald-400' : 'text-slate-700'}">${avg}%</td>`;
+                body.appendChild(row);
+            });
         }
 
         async function openReview(sub) {
             currentlyViewingId = sub.id;
-            document.getElementById('modal-student-name').innerText = sub.studentName || 'Student';
-            document.getElementById('modal-assignment').innerText = sub.assignment || 'Assignment';
-            document.getElementById('modal-word-count').innerText = `${sub.wordCount || 0} words`;
-            
-            modalContent.textContent = sub.content || "(Empty document)";
+            document.getElementById('modal-student-name').textContent = sub.studentName || 'Student';
+            document.getElementById('modal-assignment').textContent = sub.assignment || 'Assignment';
+            document.getElementById('modal-word-count').textContent = `${sub.wordCount || 0} words`;
+            document.getElementById('grade-input').value = sub.grade || '';
+            modalContent.textContent = sub.content || "";
             modal.classList.remove('hidden');
             
-            // Wait slightly for DOM to render the text height before sizing canvas
             setTimeout(() => {
                 resizeCanvas();
-                if (sub.annotations) {
-                    const img = new Image();
-                    img.onload = () => ctx.drawImage(img, 0, 0);
-                    img.src = sub.annotations;
+                if (sub.annotations) { 
+                    const img = new Image(); 
+                    img.onload = () => ctx.drawImage(img, 0, 0); 
+                    img.src = sub.annotations; 
                 }
-            }, 50);
+            }, 100);
         }
 
-        document.getElementById('close-modal').addEventListener('click', () => {
-            modal.classList.add('hidden');
-            currentlyViewingId = null;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            penEnabled = false;
-            canvasContainer.classList.remove('pen-active');
-            togglePenBtn.classList.replace('bg-blue-600', 'bg-slate-700');
-            togglePenBtn.classList.replace('text-white', 'text-slate-400');
-        });
-
-        togglePenBtn.addEventListener('click', () => {
-            penEnabled = !penEnabled;
-            if (penEnabled) {
-                canvasContainer.classList.add('pen-active');
-                togglePenBtn.classList.replace('bg-slate-700', 'bg-blue-600');
-                togglePenBtn.classList.replace('text-slate-400', 'text-white');
-            } else {
-                canvasContainer.classList.remove('pen-active');
-                togglePenBtn.classList.replace('bg-blue-600', 'bg-slate-700');
-                togglePenBtn.classList.replace('text-white', 'text-slate-400');
-            }
-        });
-
-        document.getElementById('clear-pen-btn').addEventListener('click', () => {
-            if (confirm("Clear all blue pen notes for this student?")) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        });
-
-        function getMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            // PointerEvents normalize touch, mouse, and pen into clientX/Y automatically
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-
-            return {
-                x: (e.clientX - rect.left) * scaleX,
-                y: (e.clientY - rect.top) * scaleY
-            };
-        }
-
-        function startDrawing(e) {
-            if (!penEnabled) return;
-            isDrawing = true;
-            canvas.setPointerCapture(e.pointerId); // Keeps tracking even if pen slips off canvas
-            const pos = getMousePos(e);
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-        }
-
-        function draw(e) {
-            if (!isDrawing || !penEnabled) return;
-            e.preventDefault(); // Prevent scrolling while drawing
-            const pos = getMousePos(e);
-            
-            // Pressure sensitivity for Apple Pencil
-            ctx.lineWidth = e.pressure ? (e.pressure * 5) + 1 : 2; 
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.strokeStyle = '#2563eb'; // Blue pen color
-            
-            ctx.lineTo(pos.x, pos.y);
-            ctx.stroke();
-        }
-
-        function stopDrawing(e) {
-            if (isDrawing) {
-                isDrawing = false;
-                canvas.releasePointerCapture(e.pointerId);
-            }
-        }
-
-        // Attach Modern Pointer Events for Apple Pencil
-        canvas.addEventListener('pointerdown', startDrawing);
-        canvas.addEventListener('pointermove', draw);
-        canvas.addEventListener('pointerup', stopDrawing);
-        canvas.addEventListener('pointercancel', stopDrawing);
-
-        document.getElementById('save-notes-btn').addEventListener('click', async () => {
-            if (!currentlyViewingId) return;
-            
-            const btn = document.getElementById('save-notes-btn');
+        // Teacher Actions
+        document.getElementById('save-grade-btn').onclick = async () => {
+            if(!currentlyViewingId) return;
+            const btn = document.getElementById('save-grade-btn');
             const indicator = document.getElementById('save-indicator');
-            
-            btn.textContent = "Saving...";
             btn.disabled = true;
+            indicator.style.opacity = '1';
             
             try {
-                const dataUrl = canvas.toDataURL('image/png');
-                const docRef = doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId);
-                
-                await updateDoc(docRef, {
-                    annotations: dataUrl
+                await updateDoc(doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId), {
+                    grade: document.getElementById('grade-input').value,
+                    annotations: canvas.toDataURL()
                 });
-                
-                indicator.style.opacity = '1';
-                setTimeout(() => {
-                    indicator.style.opacity = '0';
-                    btn.textContent = "Save Notes";
-                    btn.disabled = false;
-                }, 2000);
-                
-            } catch (e) {
-                console.error("Error saving annotations:", e);
-                btn.textContent = "Error!";
-                setTimeout(() => {
-                    btn.textContent = "Save Notes";
-                    btn.disabled = false;
-                }, 2000);
+                btn.innerText = "SAVED";
+                setTimeout(() => { 
+                    btn.innerText = "SAVE ALL"; 
+                    btn.disabled = false; 
+                    indicator.style.opacity = '0'; 
+                }, 1500);
+            } catch (e) { 
+                alert("Save failed. Ensure you are logged in correctly."); 
+                btn.disabled = false;
             }
-        });
+        };
 
+        // Delete Logic
+        document.getElementById('trigger-delete-btn').onclick = () => {
+            document.getElementById('trigger-delete-btn').classList.add('hidden');
+            document.getElementById('delete-confirm-ui').classList.remove('hidden');
+        };
+
+        document.getElementById('cancel-delete-btn').onclick = () => {
+            document.getElementById('delete-confirm-ui').classList.add('hidden');
+            document.getElementById('trigger-delete-btn').classList.remove('hidden');
+        };
+
+        document.getElementById('confirm-delete-btn').onclick = async () => {
+            if(!currentlyViewingId) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', targetAppId, 'public', 'data', 'submissions', currentlyViewingId));
+                modal.classList.add('hidden');
+                currentlyViewingId = null;
+                document.getElementById('delete-confirm-ui').classList.add('hidden');
+                document.getElementById('trigger-delete-btn').classList.remove('hidden');
+            } catch (e) {
+                alert("Permission Denied: Cannot delete document.");
+            }
+        };
+
+        document.getElementById('search-input').oninput = renderUI;
+        setInterval(renderUI, 30000);
+
+        // Exports
+        document.getElementById('download-zip-btn').onclick = async () => {
+            const zip = new JSZip();
+            allSubmissions.forEach(s => {
+                const name = (s.studentName||'Unnamed').replace(/[^a-z0-9]/gi, '_');
+                const title = (s.assignment||'Assignment').replace(/[^a-z0-9]/gi, '_');
+                zip.file(`${name}_${title}.txt`, `Student: ${s.studentName}\nAssignment: ${s.assignment}\nGrade: ${s.grade||'N/A'}/100\n\n${s.content}`);
+            });
+            const content = await zip.generateAsync({type:"blob"});
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(content);
+            link.download = "Grade10_History_Essays.zip";
+            link.click();
+        };
+
+        document.getElementById('export-btn').onclick = () => {
+            const csv = ["Name,Assignment,Grade,Words,Last Updated,Status"];
+            allSubmissions.forEach(s => csv.push(`"${s.studentName}","${s.assignment}","${s.grade||''}","${s.wordCount}","${new Date(s.lastUpdated).toLocaleString()}","${s.submitted ? 'Locked' : 'Draft'}"`));
+            const blob = new Blob([csv.join("\n")], {type: 'text/csv'});
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "history_grades.csv";
+            link.click();
+        };
     </script>
 </body>
 </html>
