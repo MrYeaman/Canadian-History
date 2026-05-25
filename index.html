@@ -27,6 +27,7 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
+    <!-- Login Overlay -->
     <div id="auth-overlay" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
             <div class="text-center mb-8">
@@ -53,6 +54,7 @@
         </div>
     </div>
 
+    <!-- Exit Warning Modal -->
     <div id="warning-modal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-xl max-w-sm w-full p-6 text-center">
             <h3 class="text-xl font-bold text-red-600 mb-2">Security Warning</h3>
@@ -61,6 +63,7 @@
         </div>
     </div>
 
+    <!-- Submit Confirmation Modal -->
     <div id="submit-modal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-xl max-w-sm w-full p-6 text-center border-t-8 border-green-500 shadow-2xl">
             <h3 class="text-2xl font-bold text-gray-800 mb-2">Final Submission?</h3>
@@ -72,6 +75,7 @@
         </div>
     </div>
 
+    <!-- Final Submission Blocked Overlay -->
     <div id="lock-overlay" class="fixed inset-0 bg-white z-[70] flex items-center justify-center p-4 hidden text-center">
         <div>
             <div class="text-green-500 mb-4">
@@ -144,7 +148,13 @@
         let isSubmitted = false;
         let isEntryAuthorized = false;
         let currentWordCount = 0; // Optimization: Store the word count
+        
+        // --- ANTI-CHEAT SPEED TRAP VARIABLES ---
+        let lastApprovedContent = "";
+        let lastKeyTime = Date.now();
+        let macroWarningCount = 0;
 
+        // Optimization: Cache frequently updated DOM elements
         const authOverlay = document.getElementById('auth-overlay');
         const loginBtn = document.getElementById('login-btn');
         const writingArea = document.getElementById('writing-area');
@@ -154,13 +164,11 @@
         const lockOverlay = document.getElementById('lock-overlay');
         const resumeBtn = document.getElementById('resume-btn');
         
-        // Modal elements
         const submitModal = document.getElementById('submit-modal');
         const cancelSubmitBtn = document.getElementById('cancel-submit-btn');
         const confirmSubmitBtn = document.getElementById('confirm-submit-btn');
         const submitAssessmentBtn = document.getElementById('submit-assessment-btn');
 
-        // Optimization: Cache frequently updated DOM elements
         const wordCountEl = document.getElementById('word-count');
         const userDisplay = document.getElementById('user-display');
         const headerAssignment = document.getElementById('header-assignment');
@@ -189,7 +197,6 @@
             e.preventDefault();
             
             loginBtn.textContent = "Loading...";
-            // Optimization: Use cached input elements
             firstName = firstNameInput.value.trim();
             selectedAssignment = assignmentInput.value.trim();
             
@@ -265,7 +272,6 @@
             if (!firstName || !selectedAssignment) return;
             
             authOverlay.classList.add('hidden');
-            // Optimization: Use cached elements instead of querying the DOM again
             userDisplay.textContent = firstName;
             headerAssignment.textContent = selectedAssignment;
             statusIndicator.className = "w-3 h-3 rounded-full bg-green-500";
@@ -273,6 +279,9 @@
             submissionControls.classList.remove('hidden');
             
             await loadData();
+            
+            // Set the baseline text after the draft loads from Firebase
+            lastApprovedContent = writingArea.value;
             
             if (!isSubmitted) {
                 await saveData(false);
@@ -319,6 +328,38 @@
         writingArea.addEventListener('input', () => {
             if (isSubmitted) return;
             
+            // --- ANTI-CHEAT SPEED TRAP ---
+            const now = Date.now();
+            const currentContent = writingArea.value;
+            const lengthDiff = currentContent.length - lastApprovedContent.length;
+            const timeSinceLastKey = now - lastKeyTime;
+
+            // 1. Bulk Paste / Dev Tools Injection Trap (more than 15 chars instantly)
+            if (lengthDiff > 15) {
+                writingArea.value = lastApprovedContent; // Instantly erase the injected text
+                alert("SECURITY BLOCK: Pasting and bulk text insertion is strictly prohibited.");
+                return; // Stop the save
+            }
+
+            // 2. Auto-Typer / Macro Trap (Impossibly fast consecutive keystrokes)
+            if (lengthDiff > 0 && timeSinceLastKey < 25) {
+                macroWarningCount++;
+            } else if (lengthDiff > 0) {
+                macroWarningCount = 0; // Reset if typing normally
+            }
+
+            if (macroWarningCount > 8) {
+                writingArea.value = lastApprovedContent; // Erase the macro text
+                macroWarningCount = 0;
+                alert("SECURITY BLOCK: Macro software or auto-typer detected.");
+                return; // Stop the save
+            }
+
+            // If it passes security, approve the new text to be saved
+            lastApprovedContent = currentContent;
+            lastKeyTime = now;
+            // --- END ANTI-CHEAT ---
+            
             saveStatus.textContent = "Drafting...";
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => saveData(false), 1000);
@@ -329,7 +370,6 @@
         function updateWordCount() {
             const val = writingArea.value.trim();
             currentWordCount = val ? val.split(/\s+/).length : 0;
-            // Optimization: Use cached element
             wordCountEl.textContent = `${currentWordCount} words`;
         }
 
@@ -345,7 +385,7 @@
                     assignment: selectedAssignment,
                     content: writingArea.value,
                     lastUpdated: new Date().toISOString(),
-                    wordCount: currentWordCount, // Optimization: Use the variable instead of recalculating
+                    wordCount: currentWordCount,
                     submitted: final || isSubmitted
                 }, { merge: true });
                 
