@@ -151,6 +151,9 @@
                         <button id="toggle-pen-btn" class="px-4 py-2 rounded-md text-[11px] font-bold uppercase transition flex items-center gap-2 bg-slate-700 text-slate-400 hover:text-white">
                             <span class="w-2 h-2 rounded-full bg-current"></span> Blue Pen
                         </button>
+                        <button id="undo-pen-btn" class="px-3 py-2 rounded-md text-[11px] font-bold uppercase text-slate-400 hover:bg-slate-700 hover:text-white transition border-l border-r border-slate-700" title="Undo Last Stroke">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                        </button>
                         <button id="clear-pen-btn" class="px-3 py-2 rounded-md text-[11px] font-bold uppercase text-red-400 hover:bg-red-900/30 transition">Clear</button>
                     </div>
 
@@ -221,6 +224,7 @@
         const canvas = document.getElementById('annotation-canvas');
         const ctx = canvas.getContext('2d');
         const togglePenBtn = document.getElementById('toggle-pen-btn');
+        const undoPenBtn = document.getElementById('undo-pen-btn');
 
         // Authentication State Listener
         onAuthStateChanged(auth, (user) => {
@@ -276,6 +280,26 @@
         // --- APPLE PENCIL / POINTER EVENTS LOGIC ---
         let isDrawing = false;
         let penEnabled = false;
+        let undoStack = []; // Tracks pen history for undo functionality
+
+        function saveCanvasState() {
+            undoStack.push(canvas.toDataURL());
+            // Keep memory clean by only storing the last 30 actions
+            if (undoStack.length > 30) undoStack.shift(); 
+        }
+
+        undoPenBtn.addEventListener('click', () => {
+            if (undoStack.length > 1) {
+                undoStack.pop(); // Remove the current messed up state
+                const previousState = undoStack[undoStack.length - 1]; // Get the previous state
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = previousState;
+            }
+        });
 
         function resizeCanvas() {
             canvas.width = 800;
@@ -294,7 +318,10 @@
         });
 
         document.getElementById('clear-pen-btn').onclick = () => {
-            if(confirm("Wipe all blue pen notes for this student?")) ctx.clearRect(0,0,canvas.width,canvas.height);
+            if(confirm("Wipe all blue pen notes for this student?")) {
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                saveCanvasState(); // Save the cleared state so you can undo it!
+            }
         };
 
         function getPointerCoords(e) {
@@ -331,13 +358,19 @@
         });
 
         canvas.addEventListener('pointerup', (e) => {
-            isDrawing = false;
-            canvas.releasePointerCapture(e.pointerId);
+            if (isDrawing) {
+                isDrawing = false;
+                canvas.releasePointerCapture(e.pointerId);
+                saveCanvasState(); // Save state when you lift the pen
+            }
         });
         
         canvas.addEventListener('pointercancel', (e) => {
-            isDrawing = false;
-            canvas.releasePointerCapture(e.pointerId);
+            if (isDrawing) {
+                isDrawing = false;
+                canvas.releasePointerCapture(e.pointerId);
+                saveCanvasState(); // Save state if stroke is interrupted
+            }
         });
 
         // Modal Close
@@ -462,10 +495,17 @@
             
             setTimeout(() => {
                 resizeCanvas();
+                undoStack = []; // Reset the undo history for a new student
+                
                 if (sub.annotations) { 
                     const img = new Image(); 
-                    img.onload = () => ctx.drawImage(img, 0, 0); 
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0); 
+                        saveCanvasState(); // Save the loaded annotations as the baseline
+                    };
                     img.src = sub.annotations; 
+                } else {
+                    saveCanvasState(); // Save the blank canvas as the baseline
                 }
             }, 100);
         }
