@@ -104,6 +104,7 @@
         </div>
     </header>
 
+    <!-- WRITING MODE -->
     <main id="drafting-area" class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-10 flex flex-col">
         <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg shadow-sm">
             <h2 id="prompt-title" class="text-blue-900 font-bold mb-1 text-lg">Secure Writing Mode</h2>
@@ -122,7 +123,7 @@
         </div>
     </main>
 
-    <!-- NEW: Post-Grading Feedback Screen -->
+    <!-- FEEDBACK SCREEN -->
     <div id="feedback-screen" class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-10 flex-col hidden">
         <div class="mb-8 flex justify-between items-end border-b border-gray-200 pb-6">
             <div>
@@ -175,7 +176,7 @@
         let isEntryAuthorized = false;
         let currentWordCount = 0; 
         
-        // --- ANTI-CHEAT SPEED TRAP VARIABLES ---
+        // Anti-Cheat Speed Trap Variables
         let lastApprovedContent = "";
         let lastKeyTime = Date.now();
         let macroWarningCount = 0;
@@ -318,24 +319,29 @@
                     if (data.submitted) {
                         isSubmitted = true;
                         
-                        // Check if the teacher has graded it
-                        if (data.grade !== undefined && data.grade !== "") {
-                            // Graded View
+                        // Check if teacher has provided a grade OR annotations
+                        const hasGrade = data.grade !== undefined && data.grade !== "";
+                        const hasAnnotations = data.annotations !== undefined && data.annotations !== "";
+                        
+                        if (hasGrade || hasAnnotations) {
+                            // SHOW GRADED VIEW
                             document.getElementById('drafting-area').classList.add('hidden');
                             lockOverlay.classList.add('hidden');
-                            document.getElementById('feedback-screen').classList.remove('hidden');
-                            document.getElementById('feedback-screen').classList.add('flex');
                             
-                            document.getElementById('feedback-grade').textContent = data.grade;
+                            const feedbackScreen = document.getElementById('feedback-screen');
+                            feedbackScreen.classList.remove('hidden');
+                            feedbackScreen.classList.add('flex');
+                            
+                            document.getElementById('feedback-grade').textContent = hasGrade ? data.grade : "--";
                             document.getElementById('feedback-content').textContent = data.content || "";
                             
-                            if (data.annotations) {
+                            if (hasAnnotations) {
                                 const annImg = document.getElementById('feedback-annotations');
                                 annImg.src = data.annotations;
                                 annImg.classList.remove('hidden');
                             }
                         } else {
-                            // Locked View (Waiting for Grade)
+                            // SHOW LOCKED VIEW (Waiting for teacher)
                             writingArea.value = data.content || "";
                             writingArea.disabled = true;
                             document.getElementById('lock-status-text').textContent = "Your work has been locked and is awaiting teacher review.";
